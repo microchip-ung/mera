@@ -12,7 +12,7 @@ include(.cmake/common.cmake)
 
 include_directories(include)
 
-add_library(lan9662-rte SHARED src/rte.c)
+add_library(lan9662-rte SHARED src/rte.c src/rte_ib.c src/rte_ob.c)
 
 if (${BUILD_LAN9662_RTE_DEMO})
     find_library(JSON_LIB json-c)

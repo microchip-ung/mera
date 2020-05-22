@@ -10,7 +10,9 @@ endif()
 add_library(rte-json-c SHARED IMPORTED GLOBAL) # GLOBAL -> if outside src tree
 set_property(TARGET rte-json-c PROPERTY IMPORTED_LOCATION ${JSON_LIB})
 
+add_library(lan9662-rte-demo-lib STATIC cli.c trace.c uio.c)
 add_executable(lan9662-rte-demo main.c)
+add_executable(lan9662-rte-cmd cmd.c)
 
-target_link_libraries(lan9662-rte-demo lan9662-rte rte-json-c)
+target_link_libraries(lan9662-rte-demo lan9662-rte-demo-lib lan9662-rte rte-json-c)
 
