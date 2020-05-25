@@ -32,6 +32,8 @@ void lan9662_rte_destroy(struct lan9662_rte_inst *inst);
 // RTE general configuration
 typedef struct {
     lan9662_bool_t enable; // Enable/disable RTE
+    // TODO, configure port RTE:OUTB_MISC:OUTB_CFG.OUTB_PORT
+    // 
 } lan9662_rte_gen_conf_t;
 
 // Get RTE general configuration.
@@ -43,6 +45,61 @@ int lan9662_rte_gen_conf_get(struct lan9662_rte_inst *inst,
 // conf [IN]  RTE general configuration.
 int lan9662_rte_gen_conf_set(struct lan9662_rte_inst      *inst,
                              const lan9662_rte_gen_conf_t *const conf);
+
+int lan9662_rte_gen_conf_set(struct lan9662_rte_inst      *inst,
+                             const lan9662_rte_gen_conf_t *const conf);
+
+
+//int lan9662_rte_status_get(struct lan9662_rte_inst      *inst,
+//                           const lan9662_rte_status_t *const conf);
+
+typedef struct {
+    // disable, profinet, OPCUA
+    uint8_t    admin_state;
+
+    // Invoke the write_actions directly after frame has been processed, instead
+    // of waiting for time to trigger.
+    uint8_t    write_through;
+
+    // Bit-field of frame checks to enable
+    uint32_t   pdu_checks;
+
+} lan9662_rte_rtp_conf_t;
+
+int lan9662_rte_ob_rtp_conf_set(struct lan9662_rte_inst      *inst,
+                                uint32_t                      rtp_id,
+                                const lan9662_rte_rtp_conf_t *const conf);
+
+// int lan9662_rte_ob_rtp_status_get(struct lan9662_rte_inst      *inst,
+//                                   uint32_t                      rtp_id,
+//                                   const lan9662_rte_rtp_status_t *const conf);
+
+// Add a pdu_to_dg record to the rtp_id
+int lan9662_rte_ob_rtp_pdu_to_dg_add(struct lan9662_rte_inst   *inst,
+                                     uint32_t                   rtp_id,
+                                     uint32_t                   pdu_offset,
+                                     uint32_t                   length,
+                                     uint32_t                   dg_addr);
+
+// Clear all the pdu-to-dg records for a given rtp_id
+int lan9662_rte_ob_rtp_pdu_to_dg_clr(struct lan9662_rte_inst   *inst,
+                                     uint32_t                   rtp_id);
+
+// For debugging only. Notice that it is a 2-buffer system from pdu to dg,
+// meaning that we need to use RTE:OUTB_DG_DATA_RTP_CTRL:OUTB_DG_DATA_RTP_CTRL
+// to read the latest updated section, or just inject 2 frames to update both of
+// them.
+int lan9662_rte_ob_dg_data_get(struct lan9662_rte_inst      *inst,
+                               uint32_t                      addr,
+                               uint32_t                     *value);
+
+int lan9662_rte_ob_dg_data_bulk_get(struct lan9662_rte_inst      *inst,
+                               uint32_t                      addr,
+                               uint32_t                      length
+                               uint32_t                     *value);
+
+// TODO: Once we can find the PDU data in the DG memory, then we need to
+// continue and do the 3-buffer operation
 
 /* - Trace --------------------------------------------------------- */
 
