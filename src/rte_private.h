@@ -12,8 +12,13 @@
 
 #define LAN9662_RC(expr) { int __rc__ = (expr); if (__rc__ < 0) return __rc__; }
 
+typedef struct {
+    lan9662_rte_gen_conf_t conf;
+} lan9662_rte_gen_t;
+
 typedef struct lan9662_rte_inst {
-    lan9662_rte_cb_t cb;
+    lan9662_rte_cb_t  cb;
+    lan9662_rte_gen_t gen;
 } lan9662_rte_inst_t;
 
 struct lan9662_rte_inst *lan9662_inst_get(struct lan9662_rte_inst *inst);

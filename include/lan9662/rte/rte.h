@@ -29,6 +29,21 @@ struct lan9662_rte_inst *lan9662_rte_create(const lan9662_rte_cb_t *cb);
 
 void lan9662_rte_destroy(struct lan9662_rte_inst *inst);
 
+// RTE general configuration
+typedef struct {
+    lan9662_bool_t enable; // Enable/disable RTE
+} lan9662_rte_gen_conf_t;
+
+// Get RTE general configuration.
+// conf [OUT]  RTE general configuration.
+int lan9662_rte_gen_conf_get(struct lan9662_rte_inst *inst,
+                             lan9662_rte_gen_conf_t  *const conf);
+
+// Set RTE general configuration.
+// conf [IN]  RTE general configuration.
+int lan9662_rte_gen_conf_set(struct lan9662_rte_inst      *inst,
+                             const lan9662_rte_gen_conf_t *const conf);
+
 /* - Trace --------------------------------------------------------- */
 
 // Trace groups

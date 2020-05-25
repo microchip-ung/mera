@@ -141,6 +141,7 @@ static void init_modules(mscc_appl_init_t *init)
     main_init(init);
     mscc_appl_cli_init(init);
     mscc_appl_trace_init(init);
+    mscc_appl_json_rpc_init(init);
     mscc_appl_uio_init(init);
 }
 

@@ -137,6 +137,24 @@ void lan9662_rte_destroy(struct lan9662_rte_inst *inst)
     free(inst);
 }
 
+int lan9662_rte_gen_conf_get(struct lan9662_rte_inst *inst,
+                             lan9662_rte_gen_conf_t  *const conf)
+{
+    T_I("enter");
+    inst = lan9662_inst_get(inst);
+    *conf = inst->gen.conf;
+    return 0;
+}
+
+int lan9662_rte_gen_conf_set(struct lan9662_rte_inst      *inst,
+                             const lan9662_rte_gen_conf_t *const conf)
+{
+    T_I("enter");
+    inst = lan9662_inst_get(inst);
+    inst->gen.conf = *conf;
+    return 0;
+}
+
 /* ================================================================= *
  *  Debug print
  * ================================================================= */

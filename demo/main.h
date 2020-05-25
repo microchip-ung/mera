@@ -40,7 +40,9 @@ typedef struct {
 void mscc_appl_debug_init(mscc_appl_init_t *init);
 void mscc_appl_trace_init(mscc_appl_init_t *init);
 void mscc_appl_cli_init(mscc_appl_init_t *init);
+void mscc_appl_json_rpc_init(mscc_appl_init_t *init);
 void mscc_appl_uio_init(mscc_appl_init_t *init);
+
 int uio_init(void);
 int uio_reg_read(struct lan9662_rte_inst *inst,
                  const uintptr_t         addr,
