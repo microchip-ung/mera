@@ -21,6 +21,7 @@ add_custom_target(rpc_src DEPENDS
                   ${CMAKE_CURRENT_BINARY_DIR}/rpc-ag/lan9662-rte-rpc.h
                   ${CMAKE_CURRENT_BINARY_DIR}/rpc-ag/lan9662-rte-rpc.c)
 
+include_directories(.)
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/rpc-ag)
 
 add_library(lan9662-rte-demo-lib STATIC cli.c trace.c uio.c json_rpc.c ${CMAKE_CURRENT_BINARY_DIR}/rpc-ag/lan9662-rte-rpc.c)
