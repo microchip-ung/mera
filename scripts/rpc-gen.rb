@@ -64,8 +64,8 @@ $types = {
     "i16"          => {:type_fam=>:type_alias, :type_name=>"i16",          :type_next=>"int16_t",      :type_resolved=>{:type=>"int16_t",      :abi=>:abi_stable}},
     "i32"          => {:type_fam=>:type_alias, :type_name=>"i32",          :type_next=>"int32_t",      :type_resolved=>{:type=>"int32_t",      :abi=>:abi_stable}},
     "i64"          => {:type_fam=>:type_alias, :type_name=>"i64",          :type_next=>"int64_t",      :type_resolved=>{:type=>"int64_t",      :abi=>:abi_stable}},
-    "mesa_inst_t"  => {:type_fam=>:type_alias, :type_name=>"mesa_inst_t",  :type_next=>"mesa_inst_t",  :type_resolved=>{:type=>"mesa_inst_t",  :abi=>:abi_stable}},
-    "mesa_bool_t"  => {:type_fam=>:type_alias, :type_name=>"mesa_bool_t",  :type_next=>"mesa_bool_t",  :type_resolved=>{:type=>"mesa_bool_t",  :abi=>:abi_stable}},
+    "lan9662_rte_inst"  => {:type_fam=>:type_alias, :type_name=>"lan9662_rte_inst",  :type_next=>"lan9662_rte_inst",  :type_resolved=>{:type=>"lan9662_rte_inst",  :abi=>:abi_stable}},
+    "lan9662_bool_t"  => {:type_fam=>:type_alias, :type_name=>"lan9662_bool_t",  :type_next=>"lan9662_bool_t",  :type_resolved=>{:type=>"lan9662_bool_t",  :abi=>:abi_stable}},
 
     # terminal types
     "void"         => {:type_fam=>:type_alias, :type_name=>"void",         :type_next=>"void",         :type_resolved=>{:type=>"void",         :abi=>:abi_stable}},
@@ -86,38 +86,28 @@ $types = {
     "int64_t"      => {:type_fam=>:type_alias, :type_name=>"int64_t",      :type_next=>"int64_t",      :type_resolved=>{:type=>"int64_t",      :abi=>:abi_stable}},
     "uintptr_t"    => {:type_fam=>:type_alias, :type_name=>"uintptr_t",    :type_next=>"uintptr_t",    :type_resolved=>{:type=>"uintptr_t",    :abi=>:abi_stable}},
     "vtss_inst_t"  => {:type_fam=>:type_alias, :type_name=>"vtss_inst_t",  :type_next=>"vtss_inst_t",  :type_resolved=>{:type=>"vtss_inst_t",  :abi=>:abi_stable}},
-    "mesa_port_list_t" => {:type_fam=>:type_alias, :type_name=>"mesa_port_list_t",  :type_next=>"mesa_port_list_t",  :type_resolved=>{:type=>"mesa_port_list_t",  :abi=>:abi_stable}},
 }
 $methods = {}
 
 $methods_impl_no_auto = []
 
 $methods_blacklist = [
-    "mesa_callout_trace_hex_dump",
-    "mesa_callout_trace_printf",
-    "mesa_callout_lock",
-    "mesa_callout_unlock",
-    "mesa_symreg_data_get",
-    "mesa_debug_info_get",
-    "mesa_debug_info_print",
-    "mesa_macsec_dbg_reg_dump",
-    "mesa_macsec_dbg_fcb_block_reg_dump",
-    "mesa_macsec_dbg_frm_match_handling_ctrl_reg_dump",
-    "mesa_packet_tx_frame",
-    "mesa_init_conf_get",
-    "mesa_init_conf_set",
-    "mesa_spi_slave_init",
-    "mesa_tx_timestamp_idx_alloc",
-    "mesa_tod_set_ns_cnt_cb",
-    "mesa_cap_callback_add",
+    "lan9662_rte_create",
+    "lan9662_rte_destroy",
+    "lan9662_trace_conf_get",
+    "lan9662_trace_conf_set",
+    "lan9662_callout_trace_hex_dump",
+    "lan9662_callout_trace_printf",
+    "lan9662_debug_info_get",
+    "lan9662_debug_info_print",
+    "lan9662_rte_ob_rtp_conf_set",
+    "lan9662_rte_ob_rtp_pdu_to_dg_add",
+    "lan9662_rte_ob_rtp_pdu_to_dg_clr",
+    "lan9662_rte_ob_dg_data_get",
+    "lan9662_rte_ob_dg_data_bulk_get",
 ]
 
 $methods_greylist = [
-    "mesa_qos_dscp_dpl_conf_get",
-    "mesa_qos_dscp_dpl_conf_set",
-    "mesa_qos_dpl_group_conf_get",
-    "mesa_qos_dpl_group_conf_set",
-    "mesa_tx_timestamp_idx_alloc",
 ]
 
 $conv_methods = {}
@@ -125,11 +115,6 @@ $conv_methods = {}
 $error_suppress = [
     "impl-conv: mesa_cap_t",
     "impl-conv: mesa_cap_callback_t",
-
-
-    # skipped for now...
-    "impl-conv: mesa_serdes_fields_t",
-    "impl-conv: mesa_mac_table_sr_t",
 ]
 
 $allowed_array_indexes = [
@@ -557,7 +542,7 @@ def handle_typedef ast
     return if ["i8", "i16", "i32", "i64",
                "u8", "u16", "u32", "u64",
                "BOOL", "uintptr_t",
-               "vtss_inst_t", "mesa_inst_t"].include? t
+               "vtss_inst_t", "lan9662_rte_inst"].include? t
 
     return if not type_check_black_list t
 
@@ -616,7 +601,7 @@ def analyze_return_type t
     #pp base_type
     #pp $types[base_type]
 
-    if base_type == "mesa_bool_t"
+    if base_type == "lan9662_bool_t"
         #puts "type-DB: #{__LINE__}"
         #pp $types
     end
@@ -762,34 +747,11 @@ def handle_typedef_fptr ast
     $types[t] = res
 end
 
-$methods_whitelist = [
-    "mesa_vlan_port_conf_get",
-    "mesa_vlan_port_conf_set",
-    "mesa_vlan_port_members_get",
-    "mesa_vlan_port_members_set",
-    "mesa_port_counters_get",
-    "mesa_qos_port_conf_get",
-    "mesa_ts_autoresp_dom_cfg_get",
-    "mesa_oam_mip_alloc",
-    "mesa_ace_add",
-    "mesa_phy_conf_get",
-    "mesa_phy_conf_set",
-    "mesa_phy_status_get"
-]
-
 def handle_func_proto ast
     #pp ast
     return if ast[:func_proto].nil?
     return if ast[:func_proto][:normal].nil?
     return if $methods_blacklist.include? ast[:func_proto][:normal][:name]
-
-    n = ast[:func_proto][:normal][:name]
-    if $methods_whitelist.include? n
-    else
-        if n.to_s.include? "mesa_phy"
-            return
-        end
-    end
 
     f = ast[:func_proto]
     f[:pp_stack] = []
@@ -922,12 +884,7 @@ end
 #pp ast
 
 $options[:input_files].each do |x|
-    begin
-        next if x == "./mesa/include/mscc/ethernet/switch/api/utils.h"
-        next if x == "./mesa/include/mscc/ethernet/switch/api/hdr_end.h"
-        next if x == "./mesa/include/mscc/ethernet/switch/api/hdr_start.h"
-        next if x == "./mesa/include/mscc/ethernet/switch/api/port_list.h"
-        next if /vtss/ =~ x
+   begin
         next if not (/.*\.h$/ =~ x)
 
         o_dir = "#{$options[:output_dir]}/#{File.dirname(x)}"
@@ -970,12 +927,10 @@ $tl_implemented = []
 $methods.each do |m, o|
     aaa = nil
     #begin
-        cap = (m == "mesa_capability")
         aa = analyze_args o[:args]
         aa.each do |a|
             next if a[:type_base] == "struct lan9662_rte_inst"
-            t = (cap ? "mesa_cap_t" : a[:type_resolved][:type_resolved][:type])
-            $tl << t
+            $tl << a[:type_resolved][:type_resolved][:type]
         end
     #rescue => err
     #    puts "Failed #{m}"
@@ -1025,7 +980,7 @@ def add_func name
 end
 
 def end_func
-    $c_src.puts "    return MESA_RC_OK;"
+    $c_src.puts "    return 0;"
     $c_src.puts "}"
     $c_src.puts ""
 end
@@ -1044,7 +999,7 @@ $el.each do |e|
     x = type_resolve_type e
 
     $c_src.puts "// Convert from string to enumeration"
-    add_func "mesa_rc json_rpc_enum_name_#{x[:type_name]}(json_rpc_req_t *req, const char *str, #{x[:type_name]} *parm) /* #{__LINE__} */"
+    add_func "int json_rpc_enum_name_#{x[:type_name]}(json_rpc_req_t *req, const char *str, #{x[:type_name]} *parm) /* #{__LINE__} */"
     $c_src.print "    "
     x[:members].each do |e|
         n = e[:enum_name]
@@ -1054,24 +1009,24 @@ $el.each do |e|
     end
     $c_src.puts "{"
     $c_src.puts "        sprintf(req->ptr, \"illegal enum '%s'\", str);"
-    $c_src.puts "        return MESA_RC_ERROR;"
+    $c_src.puts "        return -1;"
     $c_src.puts "    }"
     end_func
 
     $c_src.puts "// Get enumeration from array"
-    add_func "mesa_rc json_rpc_get_idx_#{x[:type_name]}(json_rpc_req_t *req, json_object *obj, int *idx, #{x[:type_name]} *parm) /* #{__LINE__} */"
+    add_func "int json_rpc_get_idx_#{x[:type_name]}(json_rpc_req_t *req, json_object *obj, int *idx, #{x[:type_name]} *parm) /* #{__LINE__} */"
     $c_src.puts "    const char *str;"
     $c_src.puts ""
-    $c_src.puts "    MESA_RC(json_rpc_get_idx_json_string(req, obj, idx, &str)); /* #{__LINE__} */"
-    $c_src.puts "    MESA_RC(json_rpc_enum_name_#{x[:type_name]}(req, str, parm)); /* #{__LINE__} */"
+    $c_src.puts "    JSON_RC(json_rpc_get_idx_json_string(req, obj, idx, &str)); /* #{__LINE__} */"
+    $c_src.puts "    JSON_RC(json_rpc_enum_name_#{x[:type_name]}(req, str, parm)); /* #{__LINE__} */"
     end_func
 
     $c_src.puts "// Get enumeration from object"
-    add_func "mesa_rc json_rpc_get_name_#{x[:type_name]}(json_rpc_req_t *req, json_object *obj, const char *name, #{x[:type_name]} *parm) /* #{__LINE__} */"
+    add_func "int json_rpc_get_name_#{x[:type_name]}(json_rpc_req_t *req, json_object *obj, const char *name, #{x[:type_name]} *parm) /* #{__LINE__} */"
     $c_src.puts "    const char *str;"
     $c_src.puts ""
-    $c_src.puts "    MESA_RC(json_rpc_get_name_json_string(req, obj, name, &str)); /* #{__LINE__} */"
-    $c_src.puts "    MESA_RC(json_rpc_enum_name_#{x[:type_name]}(req, str, parm)); /* #{__LINE__} */"
+    $c_src.puts "    JSON_RC(json_rpc_get_name_json_string(req, obj, name, &str)); /* #{__LINE__} */"
+    $c_src.puts "    JSON_RC(json_rpc_enum_name_#{x[:type_name]}(req, str, parm)); /* #{__LINE__} */"
     end_func
 
     $c_src.puts "// Convert enumeration to string"
@@ -1090,13 +1045,13 @@ $el.each do |e|
     $c_src.puts ""
 
     $c_src.puts "// Add enumeration to array"
-    add_func "mesa_rc json_rpc_add_#{x[:type_name]}(json_rpc_req_t *req, json_object *obj, #{x[:type_name]} *parm) /* #{__LINE__} */"
+    add_func "int json_rpc_add_#{x[:type_name]}(json_rpc_req_t *req, json_object *obj, #{x[:type_name]} *parm) /* #{__LINE__} */"
     $c_src.puts "    return json_rpc_add_json_string(req, obj, json_rpc_string_#{x[:type_name]}(parm));"
     $c_src.puts "}"
     $c_src.puts ""
 
     $c_src.puts "// Add enumeration to object"
-    add_func "mesa_rc json_rpc_add_name_#{x[:type_name]}(json_rpc_req_t *req, json_object *obj, const char *name, #{x[:type_name]} *parm) /* #{__LINE__} */"
+    add_func "int json_rpc_add_name_#{x[:type_name]}(json_rpc_req_t *req, json_object *obj, const char *name, #{x[:type_name]} *parm) /* #{__LINE__} */"
     $c_src.puts "    return json_rpc_add_name_json_string(req, obj, name, json_rpc_string_#{x[:type_name]}(parm));"
     $c_src.puts "}"
     $c_src.puts ""
@@ -1104,10 +1059,7 @@ $el.each do |e|
 end
 
 def member_array m
-    if m[:member_type] == "mesa_clock_identity"
-        # Hardcoded array
-        a = ["MESA_CLOCK_IDENTITY_LENGTH"]
-    elsif m[:type_array].nil?
+    if m[:type_array].nil?
         a = []
     else
         a = m[:type_array]
@@ -1117,7 +1069,7 @@ end
 
 def add_member_get_func m
     n = m[:member_name]
-    t = (m[:member_type] == "mesa_bool_t" ? "mesa_bool_t" : m[:type_resolved][:type])
+    t = (m[:member_type] == "lan9662_bool_t" ? "lan9662_bool_t" : m[:type_resolved][:type])
     str_parm = "&(parm->#{n})"
     n = "\"#{n}\""
 
@@ -1127,7 +1079,7 @@ def add_member_get_func m
 
     type_array = member_array(m)
     if type_array.size == 0
-        $c_src.puts "    MESA_RC(json_rpc_get_name_#{t}(req, obj, #{n}, #{str_parm})); /* #{__LINE__} */"
+        $c_src.puts "    JSON_RC(json_rpc_get_name_#{t}(req, obj, #{n}, #{str_parm})); /* #{__LINE__} */"
     else
         str_arr = str_parm
         str_obj = "obj_value"
@@ -1136,7 +1088,7 @@ def add_member_get_func m
         $c_src.puts "#{str_ind}{"
         str_ind += "    "
         $c_src.puts "#{str_ind}json_object *obj_value;"
-        $c_src.puts "#{str_ind}MESA_RC(json_rpc_get_name_json_object(req, obj, #{n}, &obj_value)); /* #{__LINE__} */"
+        $c_src.puts "#{str_ind}JSON_RC(json_rpc_get_name_json_object(req, obj, #{n}, &obj_value)); /* #{__LINE__} */"
         type_array.each do |i|
             $c_src.puts "#{str_ind}for (int i#{j} = 0; i#{j} < #{i}; ) {"
             str_ind += "    "
@@ -1148,9 +1100,9 @@ def add_member_get_func m
             end
             str_arr += "[i#{j} - 1]"
             if i == type_array.last
-                $c_src.puts "#{str_ind}MESA_RC(json_rpc_get_idx_#{t}(req, #{str_obj}, &i#{j}, #{str_parm})); /* #{__LINE__} */"
+                $c_src.puts "#{str_ind}JSON_RC(json_rpc_get_idx_#{t}(req, #{str_obj}, &i#{j}, #{str_parm})); /* #{__LINE__} */"
             else
-                $c_src.puts "#{str_ind}MESA_RC(json_rpc_get_idx_json_object(req, #{str_obj}, &i#{j}, &#{str_parm})); /* #{__LINE__} */"
+                $c_src.puts "#{str_ind}JSON_RC(json_rpc_get_idx_json_object(req, #{str_obj}, &i#{j}, &#{str_parm})); /* #{__LINE__} */"
             end
             str_obj = "obj#{j}"
             j += 1
@@ -1166,12 +1118,12 @@ end
 
 def add_member_add_func m
     n = m[:member_name]
-    t = (m[:member_type] == "mesa_bool_t" ? "mesa_bool_t" : m[:type_resolved][:type])
+    t = (m[:member_type] == "lan9662_bool_t" ? "lan9662_bool_t" : m[:type_resolved][:type])
     str_parm = "&(parm->#{n})"
     n = "\"#{n}\""
     type_array = member_array(m)
     if type_array.size == 0
-        $c_src.puts "    MESA_RC(json_rpc_add_name_#{t}(req, *obj, #{n}, #{str_parm})); /* #{__LINE__} */"
+        $c_src.puts "    JSON_RC(json_rpc_add_name_#{t}(req, *obj, #{n}, #{str_parm})); /* #{__LINE__} */"
     else
         str_arr = str_parm
         str_ind = "    "
@@ -1182,15 +1134,15 @@ def add_member_add_func m
             $c_src.puts "#{str_ind}{"
             str_ind += "    "
             $c_src.puts "#{str_ind}json_object *obj#{j};"
-            $c_src.puts "#{str_ind}MESA_RC(json_rpc_array_new(req, &obj#{j})); /* #{__LINE__} */"
-            $c_src.puts "#{str_ind}MESA_RC(json_rpc_add_#{nt}(req, #{n}, obj#{j})); /* #{__LINE__} */"
+            $c_src.puts "#{str_ind}JSON_RC(json_rpc_array_new(req, &obj#{j})); /* #{__LINE__} */"
+            $c_src.puts "#{str_ind}JSON_RC(json_rpc_add_#{nt}(req, #{n}, obj#{j})); /* #{__LINE__} */"
             $c_src.puts "#{str_ind}for (int i#{j} = 0; i#{j} < #{i}; i#{j}++) {"
             str_ind += "    "
             n = "obj#{j}"
             nt = "json_array"
             str_arr += "[i#{j}]"
             if i == type_array.last
-                $c_src.puts "#{str_ind}MESA_RC(json_rpc_add_#{t}(req, obj#{j}, #{str_arr})); /* #{__LINE__} */"
+                $c_src.puts "#{str_ind}JSON_RC(json_rpc_add_#{t}(req, obj#{j}, #{str_arr})); /* #{__LINE__} */"
             end
             j += 1
         end
@@ -1215,7 +1167,7 @@ $sl.each do |s|
     #pp x
     #pp x if s.include? "auto"
     $c_src.puts "// Get struct"
-    add_func "mesa_rc json_rpc_get_#{s}(json_rpc_req_t *req, json_object *obj, #{s} *parm) /* #{__LINE__} */"
+    add_func "int json_rpc_get_#{s}(json_rpc_req_t *req, json_object *obj, #{s} *parm) /* #{__LINE__} */"
     is_union = false;
     x[:members].each do |m|
         if member_is_union(m)
@@ -1225,29 +1177,29 @@ $sl.each do |s|
         end
     end
     if is_union
-        $c_src.puts "    MESA_RC(json_rpc_get2_#{s}(req, obj, parm)); /* #{__LINE__} */ // Get union"
+        $c_src.puts "    JSON_RC(json_rpc_get2_#{s}(req, obj, parm)); /* #{__LINE__} */ // Get union"
     end
     end_func
 
     $c_src.puts "// Get struct from array"
-    add_func "mesa_rc json_rpc_get_idx_#{s}(json_rpc_req_t *req, json_object *obj, int *idx, #{s} *parm) /* #{__LINE__} */"
+    add_func "int json_rpc_get_idx_#{s}(json_rpc_req_t *req, json_object *obj, int *idx, #{s} *parm) /* #{__LINE__} */"
     $c_src.puts "    json_object *obj_value;"
     $c_src.puts ""
-    $c_src.puts "    MESA_RC(json_rpc_get_idx_json_object(req, obj, idx, &obj_value)); /* #{__LINE__} */"
-    $c_src.puts "    MESA_RC(json_rpc_get_#{s}(req, obj_value, parm)); /* #{__LINE__} */"
+    $c_src.puts "    JSON_RC(json_rpc_get_idx_json_object(req, obj, idx, &obj_value)); /* #{__LINE__} */"
+    $c_src.puts "    JSON_RC(json_rpc_get_#{s}(req, obj_value, parm)); /* #{__LINE__} */"
     end_func
 
     $c_src.puts "// Get struct from object"
-    add_func "mesa_rc json_rpc_get_name_#{s}(json_rpc_req_t *req, json_object *obj, const char *name, #{s} *parm) /* #{__LINE__} */"
+    add_func "int json_rpc_get_name_#{s}(json_rpc_req_t *req, json_object *obj, const char *name, #{s} *parm) /* #{__LINE__} */"
     $c_src.puts "    json_object *obj_value;"
     $c_src.puts ""
-    $c_src.puts "    MESA_RC(json_rpc_get_name_json_object(req, obj, name, &obj_value)); /* #{__LINE__} */"
-    $c_src.puts "    MESA_RC(json_rpc_get_#{s}(req, obj_value, parm)); /* #{__LINE__} */"
+    $c_src.puts "    JSON_RC(json_rpc_get_name_json_object(req, obj, name, &obj_value)); /* #{__LINE__} */"
+    $c_src.puts "    JSON_RC(json_rpc_get_#{s}(req, obj_value, parm)); /* #{__LINE__} */"
     end_func
 
     $c_src.puts "// Create struct object"
-    add_func "mesa_rc json_rpc_new_#{s}(json_rpc_req_t *req, json_object **obj, #{s} *parm) /* #{__LINE__} */"
-    $c_src.puts "    MESA_RC(json_rpc_new(req, obj)); /* #{__LINE__} */"
+    add_func "int json_rpc_new_#{s}(json_rpc_req_t *req, json_object **obj, #{s} *parm) /* #{__LINE__} */"
+    $c_src.puts "    JSON_RC(json_rpc_new(req, obj)); /* #{__LINE__} */"
     is_union = false;
     x[:members].each do |m|
         if member_is_union(m)
@@ -1257,24 +1209,24 @@ $sl.each do |s|
         end
     end
     if is_union
-        $c_src.puts "    MESA_RC(json_rpc_add2_#{s}(req, *obj, parm));  /* #{__LINE__} */ // Add union"
+        $c_src.puts "    JSON_RC(json_rpc_add2_#{s}(req, *obj, parm));  /* #{__LINE__} */ // Add union"
     end
     end_func
 
     $c_src.puts "// Add struct to array"
-    add_func "mesa_rc json_rpc_add_#{s}(json_rpc_req_t *req, json_object *obj, #{s} *parm) /* #{__LINE__} */"
+    add_func "int json_rpc_add_#{s}(json_rpc_req_t *req, json_object *obj, #{s} *parm) /* #{__LINE__} */"
     $c_src.puts "    json_object *obj_value;"
     $c_src.puts ""
-    $c_src.puts "    MESA_RC(json_rpc_new_#{s}(req, &obj_value, parm)); /* #{__LINE__} */"
-    $c_src.puts "    MESA_RC(json_rpc_add_json_array(req, obj, obj_value)); /* #{__LINE__} */"
+    $c_src.puts "    JSON_RC(json_rpc_new_#{s}(req, &obj_value, parm)); /* #{__LINE__} */"
+    $c_src.puts "    JSON_RC(json_rpc_add_json_array(req, obj, obj_value)); /* #{__LINE__} */"
     end_func
   
     $c_src.puts "// Add struct to object"
-    add_func "mesa_rc json_rpc_add_name_#{s}(json_rpc_req_t *req, json_object *obj, const char *name, #{s} *parm) /* #{__LINE__} */"
+    add_func "int json_rpc_add_name_#{s}(json_rpc_req_t *req, json_object *obj, const char *name, #{s} *parm) /* #{__LINE__} */"
     $c_src.puts "    json_object *obj_value;"
     $c_src.puts ""
-    $c_src.puts "    MESA_RC(json_rpc_new_#{s}(req, &obj_value, parm)); /* #{__LINE__} */"
-    $c_src.puts "    MESA_RC(json_rpc_add_name_json_object(req, obj, name, obj_value)); /* #{__LINE__} */"
+    $c_src.puts "    JSON_RC(json_rpc_new_#{s}(req, &obj_value, parm)); /* #{__LINE__} */"
+    $c_src.puts "    JSON_RC(json_rpc_add_name_json_object(req, obj, name, obj_value)); /* #{__LINE__} */"
     end_func
     $c_hdr.puts ""
 end
@@ -1286,25 +1238,13 @@ end
 $methods.each do |m, o|
     begin
         next if $methods_greylist.include? m
-        $c_src.puts "static mesa_rc mesa_rpc_#{m}(json_rpc_req_t *req) /* #{__LINE__} */"
+        $c_src.puts "static int rte_rpc_#{m}(json_rpc_req_t *req) /* #{__LINE__} */"
         $c_src.puts "{"
         aa = analyze_args o[:args]
 
-        if m == "mesa_capability"
-            $c_src.puts "    mesa_cap_t cap;"
-            $c_src.puts "    int val;"
-            $c_src.puts "    MESA_RC(json_rpc_get_idx_mesa_cap_t(req, req->params, &req->idx, &cap));"
-            $c_src.puts "    val = mesa_capability(NULL, cap);"
-            $c_src.puts "    MESA_RC(json_rpc_add_int(req, req->result, &val));"
-            $c_src.puts ""
-            $c_src.puts "    return MESA_RC_OK;"
-            $c_src.puts "}"
-            next
-        end
-
         str1 = ""
         aa.each do |a|
-            next if a[:type_base] == "mesa_inst_t"
+            next if a[:type_base] == "struct lan9662_rte_inst"
             str = a[:type_base]
             str1 = "[#{a[:array][0]}]" if (a[:array].size > 0)
             $c_src.puts "    #{str} #{a[:arg_name]}#{str1};"
@@ -1313,7 +1253,7 @@ $methods.each do |m, o|
         $c_src.puts ""
         prev_arg = ""
         aa.each do |a|
-            next if a[:type_base] == "mesa_inst_t"
+            next if a[:type_base] == "struct lan9662_rte_inst"
             next if a[:direction] == :DIR_OUT
             if (a[:array].size > 0)
                 end_str = a[:array][0]
@@ -1327,33 +1267,33 @@ $methods.each do |m, o|
             #$c_src.puts a.pretty_inspect
             #$c_src.puts "#endif"
 
-            t = (a[:type_base] == "mesa_bool_t" ? "mesa_bool_t" : type_resolve(a[:type_base])[:type])
+            t = (a[:type_base] == "lan9662_bool_t" ? "lan9662_bool_t" : type_resolve(a[:type_base])[:type])
             if (end_str.length > 0)
                 $c_src.puts "    {"
                 $c_src.puts "        json_object *obj;"
-                $c_src.puts "        MESA_RC(json_rpc_get_idx_json_object(req, req->params, &req->idx, &obj)); /* #{__LINE__} */"
+                $c_src.puts "        JSON_RC(json_rpc_get_idx_json_object(req, req->params, &req->idx, &obj)); /* #{__LINE__} */"
                 $c_src.puts "        for (int i = 0; i < #{end_str}; ) {"
-                $c_src.puts "            MESA_RC(json_rpc_get_idx_#{t}(req, obj, &i, &#{a[:arg_name]}[i])); /* #{__LINE__} */"
+                $c_src.puts "            JSON_RC(json_rpc_get_idx_#{t}(req, obj, &i, &#{a[:arg_name]}[i])); /* #{__LINE__} */"
                 $c_src.puts "        }"
                 $c_src.puts "    }"
             else
-                $c_src.puts "    MESA_RC(json_rpc_get_idx_#{t}(req, req->params, &req->idx, &#{a[:arg_name]})); /* #{__LINE__} */"
+                $c_src.puts "    JSON_RC(json_rpc_get_idx_#{t}(req, req->params, &req->idx, &#{a[:arg_name]})); /* #{__LINE__} */"
             end
             prev_arg = a[:arg_name]
         end
 
         begin
-            has_rc = (o[:normal][:type].to_s.strip == "mesa_rc")
+            has_rc = (o[:normal][:type].to_s.strip == "int")
             $c_src.puts "/* #{__LINE__} */"
             if has_rc
-                $c_src.print "    MESA_RC(json_rpc_call(req, #{m}("
+                $c_src.print "    JSON_RC(json_rpc_call(req, #{m}("
             else
                 $c_src.print "    #{m}("
             end
             is_array = false
             aa.each do |a|
                 $c_src.print ", " if a != aa.first
-                if a[:type_base] == "mesa_inst_t"
+                if a[:type_base] == "struct lan9662_rte_inst"
                     $c_src.print "NULL"
                 else
                     $c_src.print "&" if a[:ptr] and !is_array
@@ -1369,12 +1309,12 @@ $methods.each do |m, o|
         prev_arg = ""
 
         aa.each do |a|
-            next if a[:type_base] == "mesa_inst_t"
+            next if a[:type_base] == "struct lan9662_rte_inst"
 
             #$c_src.puts "#if 0"
             #$c_src.puts a.pretty_inspect
             #$c_src.puts "#endif"
-            t = (a[:type_base] == "mesa_bool_t" ? "mesa_bool_t" : type_resolve(a[:type_base])[:type])
+            t = (a[:type_base] == "lan9662_bool_t" ? "lan9662_bool_t" : type_resolve(a[:type_base])[:type])
 
             if a[:direction] == :DIR_IN
                 $c_src.puts "    json_object_array_add(req->result, NULL);  /* #{a[:arg_name]} #{__LINE__} */"
@@ -1382,21 +1322,21 @@ $methods.each do |m, o|
             elsif arg_is_count(m, prev_arg)
                 $c_src.puts "    {"
                 $c_src.puts "        json_object *obj;"
-                $c_src.puts "        MESA_RC(json_rpc_array_new(req, &obj)); /* #{__LINE__} */"
-                $c_src.puts "        MESA_RC(json_rpc_add_json_array(req, req->result, obj)); /* #{__LINE__} */"
+                $c_src.puts "        JSON_RC(json_rpc_array_new(req, &obj)); /* #{__LINE__} */"
+                $c_src.puts "        JSON_RC(json_rpc_add_json_array(req, req->result, obj)); /* #{__LINE__} */"
                 $c_src.puts "        for (int i = 0; i < #{prev_arg}; i++) {"
-                $c_src.puts "            MESA_RC(json_rpc_add_#{t}(req, obj, &#{a[:arg_name]}[i])); /* #{__LINE__} */"
+                $c_src.puts "            JSON_RC(json_rpc_add_#{t}(req, obj, &#{a[:arg_name]}[i])); /* #{__LINE__} */"
                 $c_src.puts "        }"
                 $c_src.puts "    }"
             else
-                $c_src.puts "    MESA_RC(json_rpc_add_#{t}(req, req->result, &#{a[:arg_name]})); /* #{__LINE__} */"
+                $c_src.puts "    JSON_RC(json_rpc_add_#{t}(req, req->result, &#{a[:arg_name]})); /* #{__LINE__} */"
 
             end
 
             prev_arg = a[:arg_name]
         end
         $c_src.puts ""
-        $c_src.puts "    return MESA_RC_OK;"
+        $c_src.puts "    return 0;"
         $c_src.puts "}"
         $c_src.puts ""
     rescue => err
@@ -1410,7 +1350,7 @@ $c_src.puts "json_rpc_method_t json_rpc_table[] = {"
 $methods.each do |m, o|
     begin
         next if $methods_greylist.include? m
-        $c_src.puts "    { \"#{m}\", mesa_rpc_#{m} }, "
+        $c_src.puts "    { \"#{m}\", rte_rpc_#{m} }, "
     rescue => err
         puts "Failed #{m}"
         pp o

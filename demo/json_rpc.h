@@ -3,6 +3,7 @@
 
 
 #include <stdio.h>
+#include <string.h>
 #include <json-c/json.h>
 #include "lan9662/rte.h"
 
@@ -99,7 +100,7 @@ int json_rpc_get_name_int(json_rpc_req_t *req, json_object *obj, const char *nam
 int json_rpc_get_int(json_rpc_req_t *req, json_object *obj, int *value);
 
 // Boolean
-int json_rpc_get_idx_mesa_bool_t(json_rpc_req_t *req, json_object *obj, int *idx, lan9662_bool_t *value);
-int json_rpc_get_name_mesa_bool_t(json_rpc_req_t *req, json_object *obj, const char *name, lan9662_bool_t *value);
-int json_rpc_add_mesa_bool_t(json_rpc_req_t *req, json_object *obj, lan9662_bool_t *value);
-int json_rpc_add_name_mesa_bool_t(json_rpc_req_t *req, json_object *obj, const char *name, lan9662_bool_t *value);
+int json_rpc_get_idx_lan9662_bool_t(json_rpc_req_t *req, json_object *obj, int *idx, lan9662_bool_t *value);
+int json_rpc_get_name_lan9662_bool_t(json_rpc_req_t *req, json_object *obj, const char *name, lan9662_bool_t *value);
+int json_rpc_add_lan9662_bool_t(json_rpc_req_t *req, json_object *obj, lan9662_bool_t *value);
+int json_rpc_add_name_lan9662_bool_t(json_rpc_req_t *req, json_object *obj, const char *name, lan9662_bool_t *value);

@@ -15,7 +15,7 @@ int lan9662_ib_debug_print(struct lan9662_rte_inst *inst,
                            const lan9662_debug_info_t   *const info)
 {
     lan9662_debug_print_reg_header(pr, "RTE Inbound");
-    lan9662_debug_reg(inst, pr, REG_ADDR(RTE_I_CFG), "RTE_INB_CFG");
+    lan9662_debug_reg(inst, pr, REG_ADDR(RTE_INB_CFG), "RTE_INB_CFG");
     pr("\n");
     return 0;
 }

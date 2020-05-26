@@ -33,7 +33,6 @@ void lan9662_rte_destroy(struct lan9662_rte_inst *inst);
 typedef struct {
     lan9662_bool_t enable; // Enable/disable RTE
     // TODO, configure port RTE:OUTB_MISC:OUTB_CFG.OUTB_PORT
-    // 
 } lan9662_rte_gen_conf_t;
 
 // Get RTE general configuration.
@@ -45,10 +44,6 @@ int lan9662_rte_gen_conf_get(struct lan9662_rte_inst *inst,
 // conf [IN]  RTE general configuration.
 int lan9662_rte_gen_conf_set(struct lan9662_rte_inst      *inst,
                              const lan9662_rte_gen_conf_t *const conf);
-
-int lan9662_rte_gen_conf_set(struct lan9662_rte_inst      *inst,
-                             const lan9662_rte_gen_conf_t *const conf);
-
 
 //int lan9662_rte_status_get(struct lan9662_rte_inst      *inst,
 //                           const lan9662_rte_status_t *const conf);
@@ -94,9 +89,9 @@ int lan9662_rte_ob_dg_data_get(struct lan9662_rte_inst      *inst,
                                uint32_t                     *value);
 
 int lan9662_rte_ob_dg_data_bulk_get(struct lan9662_rte_inst      *inst,
-                               uint32_t                      addr,
-                               uint32_t                      length
-                               uint32_t                     *value);
+                                    uint32_t                      addr,
+                                    uint32_t                      length,
+                                    uint32_t                     *value);
 
 // TODO: Once we can find the PDU data in the DG memory, then we need to
 // continue and do the 3-buffer operation

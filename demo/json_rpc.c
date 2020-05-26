@@ -8,8 +8,7 @@
 #include <sys/socket.h>
 #include <errno.h>
 #include <netinet/in.h>
-//#include <rte-rpc.h>
-#include "json_rpc.h"
+#include <lan9662-rte-rpc.h>
 #include "main.h"
 #include "trace.h"
 #include "cli.h"
@@ -571,7 +570,7 @@ int json_rpc_add_name_int64_t(json_rpc_req_t *req, json_object *obj, const char 
 /* - Boolean ------------------------------------------------------- */
 
 // Get from array
-int json_rpc_get_idx_mesa_bool_t(json_rpc_req_t *req, json_object *obj, int *idx, lan9662_bool_t *value)
+int json_rpc_get_idx_lan9662_bool_t(json_rpc_req_t *req, json_object *obj, int *idx, lan9662_bool_t *value)
 {
     json_object *obj_value;
 
@@ -581,7 +580,7 @@ int json_rpc_get_idx_mesa_bool_t(json_rpc_req_t *req, json_object *obj, int *idx
 }
 
 // Get from object
-int json_rpc_get_name_mesa_bool_t(json_rpc_req_t *req, json_object *obj, const char *name, lan9662_bool_t *value)
+int json_rpc_get_name_lan9662_bool_t(json_rpc_req_t *req, json_object *obj, const char *name, lan9662_bool_t *value)
 {
     json_object *obj_value;
 
@@ -591,13 +590,13 @@ int json_rpc_get_name_mesa_bool_t(json_rpc_req_t *req, json_object *obj, const c
 }
 
 // Add to array
-int json_rpc_add_mesa_bool_t(json_rpc_req_t *req, json_object *obj, lan9662_bool_t *value)
+int json_rpc_add_lan9662_bool_t(json_rpc_req_t *req, json_object *obj, lan9662_bool_t *value)
 {
     return json_rpc_add_json_array(req, obj, json_object_new_boolean(*value));
 }
 
 // Add to object
-int json_rpc_add_name_mesa_bool_t(json_rpc_req_t *req, json_object *obj, const char *name, lan9662_bool_t *value)
+int json_rpc_add_name_lan9662_bool_t(json_rpc_req_t *req, json_object *obj, const char *name, lan9662_bool_t *value)
 {
     return json_rpc_add_name_json_object(req, obj, name, json_object_new_boolean(*value));
 }
@@ -614,14 +613,12 @@ static int find_and_call_method(const char *method_name, json_rpc_req_t *req)
     int                 found = 0;
     json_rpc_method_t   *method;
 
-#if 0
     for (method = json_rpc_table; method->cb != NULL && !found; method++) {
         if (!strcmp(method->name, method_name)) {
             found = 1;
             method->cb(req);
         }
     }
-#endif
     for (method = json_rpc_static_table; method->cb != NULL && !found; method++) {
         if (!strcmp(method->name, method_name)) {
             found = 1;
@@ -714,213 +711,6 @@ static cli_cmd_t cli_cmd_table[] = {
     },
 };
 
-static int json_rpc_parse(int fd, char *msg)
-{
-    json_object       *obj_req, *obj_rep, *obj_result, *obj_error, *obj_method, *obj_id;
-    const char        *method_name, *reply;
-    json_rpc_req_t    req = {};
-    int               send_reply = 0, found = 0;
-    uint32_t          len, *p;
-    char              hdr[JSON_RPC_HDR_LEN];
-
-    T_N("request: %s", msg);
-
-    req.idx = 0;
-    req.result = NULL;
-    sprintf(req.buf, "internal error");
-    if ((obj_req = json_tokener_parse(msg)) == NULL) {
-        T_I("json_tokener_parse failed");
-    } else if (!json_object_object_get_ex(obj_req, "method", &obj_method)) {
-        T_I("method object not found");
-    } else if (json_object_get_type(obj_method) != json_type_string) {
-        T_I("method object not string");
-    } else if (!json_object_object_get_ex(obj_req, "params", &req.params)) {
-        T_I("params object not found");
-    } else if (json_object_get_type(req.params) != json_type_array) {
-        T_I("params object not array");
-    } else if (!json_object_object_get_ex(obj_req, "id", &obj_id)) {
-        T_I("id object not found");
-    } else if ((req.result = json_object_new_array()) == NULL) {
-        T_I("alloc reply object failed");
-    } else {
-        // Lookup and call method
-        send_reply = 1;
-        method_name = json_object_get_string(obj_method);
-        req.ptr = req.buf;
-        req.ptr += sprintf(req.ptr, "method '%s': ", method_name);
-
-        found = find_and_call_method(method_name, &req);
-
-        if (!found) {
-            sprintf(req.ptr, "not found");
-            req.error = 1;
-        }
-    }
-    
-    if (send_reply && (obj_rep = json_object_new_object()) != NULL) {
-        if (req.error) {
-            obj_result = NULL;
-            obj_error = json_object_new_string(req.buf);
-        } else {
-            obj_result = req.result;
-            req.result = NULL; // Ownership transferred to obj_rep below
-            obj_error = NULL;
-        }
-        json_object_object_add(obj_rep, "result", obj_result);
-        json_object_object_add(obj_rep, "error", obj_error);
-        json_object_object_add(obj_rep, "id", json_object_get(obj_id));
-        reply = json_object_to_json_string(obj_rep);
-        len = strlen(reply);
-        p = (uint32_t *)hdr;
-        *p = htonl(len);
-        T_I("reply length: %u", len);
-        T_D("reply: %s", reply);
-        if (write(fd, hdr, sizeof(hdr)) != sizeof(hdr) || 
-            write(fd, reply, len) != len) {
-            T_E("write error");
-        }
-        json_object_put(obj_rep);
-    }
-
-    // Free objects (the call ignores NULL object)
-    json_object_put(obj_req);
-    json_object_put(req.result);
-
-    return 0;
-}
-
-typedef struct {
-    int                fd;
-    struct sockaddr_in addr;
-    uint32_t           len;
-    uint32_t           rx_cnt;
-    char               *msg;
-} json_rpc_con_t;
-
-#define FD_FREE (-1)
-#define JSON_RPC_CON_MAX 4
-static json_rpc_con_t json_rpc_con_table[JSON_RPC_CON_MAX];
-
-static json_rpc_con_t *json_rpc_connection_lookup(int fd)
-{
-    int            i;
-    json_rpc_con_t *con;
-
-    for (i = 0; i < JSON_RPC_CON_MAX; i++) {
-        con = &json_rpc_con_table[i];
-        if (con->fd == fd) {
-            return con;
-        }
-    }
-    return NULL;
-}
-
-static void json_rpc_connection(int fd, void *ref)
-{
-    int            n, error = 1;
-    uint32_t       len;
-    json_rpc_con_t *con;
-    char           hdr[JSON_RPC_HDR_LEN], *p = hdr;
-
-    // Lookup connection
-    if ((con = json_rpc_connection_lookup(fd)) == NULL) {
-        T_E("connection not found");
-        return;
-    }
-
-    if (con->len == 0) {
-        // Read header
-        if ((n = read(fd, hdr, sizeof(hdr))) < sizeof(hdr)) {
-            T_I("header small");
-        } else if ((len = ntohl(*(uint32_t *)p)) == 0 || len > (100 * 1024)) {
-            T_E("illegal length: %u", len);
-        } else if ((con->msg = (char *)malloc(len + 1)) == NULL) {
-            T_E("msg malloc failed");
-        } else {
-            T_I("data length: %u", len);
-            con->len = len;
-            return;
-        }
-    } else if ((n = read(fd, con->msg + con->rx_cnt, con->len - con->rx_cnt)) <= 0) {
-        // Read data failed
-        T_I("no data");
-    } else {
-        // Read data success
-        error = 0;
-        con->rx_cnt += n;
-        if (con->rx_cnt != con->len) {
-            // Message not complete
-            return;
-        }
-        con->msg[con->len] = 0;
-        error = json_rpc_parse(fd, con->msg);
-    }
-
-    // Free message
-    if (con->msg) {
-        free(con->msg);
-    }
-    memset(con, 0, sizeof(*con));
-
-    if (error) {
-        T_I("closing connection");
-        close(fd);
-        if (fd_read_register(fd, NULL, NULL)) {
-            T_E("Failed to un-rgister fd");
-        }
-        con->fd = FD_FREE;
-    } else {
-        // Preserve file descriptor
-        con->fd = fd;
-    }
-}
-
-static void json_rpc_accept(int fd, void *ref)
-{
-    json_rpc_con_t *con;
-    socklen_t      len = sizeof(con->addr);
-    
-    // Lookup free connection
-    if ((con = json_rpc_connection_lookup(FD_FREE)) == NULL) {
-        T_E("no free connection");
-    } else if ((fd = accept(fd, (struct sockaddr *)&con->addr, &len)) < 0) {
-        T_E("accept() failed: %s", strerror(errno));
-    } else if (fd_read_register(fd, json_rpc_connection, NULL) < 0) {
-        T_E("fd_read_register() failed");
-    } else {
-        T_N("new connection accepted");
-        con->fd = fd;
-    }
-}
-
-static void json_rpc_init(void)
-{
-    int                i, fd;
-    struct sockaddr_in addr;
-
-    T_D("enter");
-    for (i = 0; i < JSON_RPC_CON_MAX; i++) {
-        json_rpc_con_table[i].fd = FD_FREE;
-    }
-    bzero(&addr, sizeof(addr));
-    addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    addr.sin_port = htons(4321);
-    if ((fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-        T_E("socket failed: %s", strerror(errno));
-    } else if (bind(fd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
-        T_E("bind failed: %s", strerror(errno));
-        close(fd);
-    } else if (listen(fd, 1) < 0) {
-        T_E("listen failed: %s", strerror(errno));
-        close(fd);
-    } else if (fd_read_register(fd, json_rpc_accept, NULL) < 0) {
-        T_E("fd_read_register() failed");
-        close(fd);
-    }
-    T_D("exit");
-}
-
 void mscc_appl_json_rpc_init(mscc_appl_init_t *init)
 {
     int i;
@@ -931,12 +721,9 @@ void mscc_appl_json_rpc_init(mscc_appl_init_t *init)
         break;
 
     case MSCC_INIT_CMD_INIT:
-        json_rpc_init();
-
         for (i = 0; i < sizeof(cli_cmd_table)/sizeof(cli_cmd_t); i++) {
             mscc_appl_cli_cmd_reg(&cli_cmd_table[i]);
         }
-
         break;
 
     default:
