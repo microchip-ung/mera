@@ -95,10 +95,10 @@ static int lan9662_gen_init(struct lan9662_rte_inst *inst)
     uint32_t val;
 
     T_I("enter");
-    REG_RD(GCB_BUILDID, &val);
-    if (val != LAN966x_BUILD_ID) {
-        T_E("unexpected build id. Got: %08x Expected %08x", val, LAN966x_BUILD_ID);
-        return -1;
+    REG_RD(LAN966X_BUILD_ID_REG, &val);
+    if (val != LAN966X_BUILD_ID) {
+        T_E("unexpected build id. Got: %08x Expected %08x", val, LAN966X_BUILD_ID);
+        //return -1;
     }
     T_I("build id: 0x%08x", val);
     return 0;

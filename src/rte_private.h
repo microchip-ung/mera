@@ -8,7 +8,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <lan9662/rte.h>
+#if 1
+#include "lan9662_regs_sr.h"
+#else
 #include "lan9662_regs.h"
+#endif
 
 #define LAN9662_RC(expr) { int __rc__ = (expr); if (__rc__ < 0) return __rc__; }
 
@@ -31,50 +35,33 @@ int lan9662_rd(struct lan9662_rte_inst *inst, uint32_t addr, uint32_t *val);
 int lan9662_wrm(struct lan9662_rte_inst *inst, uint32_t reg, uint32_t val, uint32_t mask);
 void lan9662_reg_error(const char *file, int line);
 
-// TODO This should come from the CML file and go into the auto-generated header
-#define LAN9662_TARGET_MAX 22
 inline uint32_t lan9662_target_id_to_addr(int target_id)
 {
     switch (target_id) {
-        case  0: return 0x00300000;
-        case  1: return 0x00280000;
-        case  2: return 0x00100000;
-        case  3: return 0x00110000;
-        case  4: return 0x00120000;
-        case  5: return 0x00130000;
-        case  6: return 0x00140000;
-        case  7: return 0x00150000;
-        case  8: return 0x00160000;
-        case  9: return 0x00170000;
-        case 10: return 0x00070000;
-        case 11: return 0x00ff0000;
-        case 12: return 0x000a0000;
-        case 13: return 0x00000000;
-        case 14: return 0x00090000;
-        case 15: return 0x00080000;
-        case 16: return 0x00200000;
-        case 17: return 0x00030000;
-        case 18: return 0x00380000;
-        case 19: return 0x00010000;
-        case 20: return 0x00040000;
-        case 21: return 0x00050000;
-        case 22: return 0x00060000;
-        default: return 0xffffffff;
+#if defined(CPU_BUILDID)
+    case TARGET_CPU: return LAN966X_TARGET_CPU_OFFSET;
+#endif
+#if defined(GCB_BUILDID)
+    case TARGET_GCB: return LAN966X_TARGET_GCB_OFFSET;
+#endif
+    case TARGET_RTE: return LAN966X_TARGET_RTE_OFFSET;
+    default: return 0xffffffff;
     }
 }
-// End of hard-coded Adaro constants. //////////////////////////////////////////
 
 inline uint32_t __ioreg(const char *file, int line, int tbaseid, int tinst, int tcnt,
                         int gbase, int ginst, int gcnt, int gwidth,
                         int raddr, int rinst, int rcnt, int rwidth)
 {
-    if (tbaseid + tinst > LAN9662_TARGET_MAX || tinst >= tcnt ||
+    uint32_t addr = lan9662_target_id_to_addr(tbaseid + tinst);
+
+    if (addr == 0xffffffff || tinst >= tcnt ||
         ginst >= gcnt || rinst >= rcnt) {
         lan9662_reg_error(file, line);
         return 0xffffffff;
     }
 
-    return (lan9662_target_id_to_addr(tbaseid + tinst) +
+    return (addr +
             gbase + ((ginst) * gwidth) +
             raddr + ((rinst) * rwidth)) / 4;
 }
