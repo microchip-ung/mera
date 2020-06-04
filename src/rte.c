@@ -92,13 +92,18 @@ int lan9662_wrm(struct lan9662_rte_inst *inst, uint32_t addr, uint32_t value, ui
 
 static int lan9662_gen_init(struct lan9662_rte_inst *inst)
 {
-    uint32_t val;
+    uint32_t val, diff;
 
     T_I("enter");
-    REG_RD(LAN966X_BUILD_ID_REG, &val);
-    if (val != LAN966X_BUILD_ID) {
-        T_E("unexpected build id. Got: %08x Expected %08x", val, LAN966X_BUILD_ID);
-        //return -1;
+    REG_RD(GCB_BUILDID, &val);
+    if (val > LAN966X_BUILD_ID) {
+        diff = (val - LAN966X_BUILD_ID);
+    } else {
+        diff = (LAN966X_BUILD_ID - val);
+    }
+    if (diff > 1000) {
+        T_E("unexpected build id. Got: %08x, expected %08x, diff: %u", val, LAN966X_BUILD_ID, diff);
+        return -1;
     }
     T_I("build id: 0x%08x", val);
     return 0;
@@ -189,6 +194,16 @@ void lan9662_debug_reg(struct lan9662_rte_inst *inst,
     if (lan9662_rd(inst, addr, &value) == 0) {
         lan9662_debug_print_reg(pr, name, value);
     }
+}
+
+void lan9662_debug_reg_inst(struct lan9662_rte_inst *inst,
+                            const lan9662_debug_printf_t pr,
+                            uint32_t addr, uint32_t i, const char *name)
+{
+    char buf[64];
+
+    sprintf(buf, "%s_%u", name, i);
+    lan9662_debug_reg(inst, pr, addr, buf);
 }
 
 static int lan9662_gen_debug_print(struct lan9662_rte_inst *inst,

@@ -8,6 +8,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <lan9662/rte.h>
+
+#define VTSS_BIT(x)                   (1U << (x))
+#define VTSS_BITMASK(x)               ((1U << (x)) - 1)
+#define VTSS_EXTRACT_BITFIELD(x,o,w)  (((x) >> (o)) & VTSS_BITMASK(w))
+#define VTSS_ENCODE_BITFIELD(x,o,w)   (((x) & VTSS_BITMASK(w)) << (o))
+#define VTSS_ENCODE_BITMASK(o,w)      (VTSS_BITMASK(w) << (o))
+
 #if 1
 #include "lan9662_regs_sr.h"
 #else
@@ -16,13 +23,39 @@
 
 #define LAN9662_RC(expr) { int __rc__ = (expr); if (__rc__ < 0) return __rc__; }
 
+// RTE general state
 typedef struct {
     lan9662_rte_gen_conf_t conf;
 } lan9662_rte_gen_t;
 
+// One more entry for direct 1-based indexing
+#define RTE_OB_RTP_CNT (LAN9662_RTE_RTP_CNT + 1)
+#define RTE_OB_DG_CNT  (LAN9662_RTE_RTP_CNT + 1)
+
+// RTP entry
+typedef struct {
+    lan9662_rte_ob_rtp_conf_t conf; // Configuration
+    uint16_t                  addr; // First address
+} lan9662_rte_ob_rtp_entry_t;
+
+// DG entry
+typedef struct {
+    lan9662_rte_ob_rtp_pdu2dg_conf_t conf;   // Configuration
+    uint16_t                         rtp_id; // Zero indicates free entry
+    uint16_t                         addr;   // Next address
+} lan9662_rte_ob_dg_entry_t;
+
+// RTE OB state
+typedef struct {
+    lan9662_rte_ob_rtp_entry_t rtp_tbl[RTE_OB_RTP_CNT];
+    lan9662_rte_ob_dg_entry_t  dg_tbl[RTE_OB_DG_CNT];
+} lan9662_rte_ob_t;
+
+// RTE state
 typedef struct lan9662_rte_inst {
     lan9662_rte_cb_t  cb;
     lan9662_rte_gen_t gen;
+    lan9662_rte_ob_t  ob;
 } lan9662_rte_inst_t;
 
 struct lan9662_rte_inst *lan9662_inst_get(struct lan9662_rte_inst *inst);
@@ -37,16 +70,8 @@ void lan9662_reg_error(const char *file, int line);
 
 inline uint32_t lan9662_target_id_to_addr(int target_id)
 {
-    switch (target_id) {
-#if defined(CPU_BUILDID)
-    case TARGET_CPU: return LAN966X_TARGET_CPU_OFFSET;
-#endif
-#if defined(GCB_BUILDID)
-    case TARGET_GCB: return LAN966X_TARGET_GCB_OFFSET;
-#endif
-    case TARGET_RTE: return LAN966X_TARGET_RTE_OFFSET;
-    default: return 0xffffffff;
-    }
+    return (target_id == TARGET_GCB ? LAN966X_TARGET_GCB_OFFSET :
+            target_id == TARGET_RTE ? LAN966X_TARGET_RTE_OFFSET : 0xffffffff);
 }
 
 inline uint32_t __ioreg(const char *file, int line, int tbaseid, int tinst, int tcnt,
@@ -179,6 +204,9 @@ extern lan9662_trace_conf_t lan9662_trace_conf[];
 void lan9662_debug_print_reg_header(const lan9662_debug_printf_t pr, const char *name);
 void lan9662_debug_reg(struct lan9662_rte_inst *inst,
                        const lan9662_debug_printf_t pr, uint32_t addr, const char *name);
+void lan9662_debug_reg_inst(struct lan9662_rte_inst *inst,
+                            const lan9662_debug_printf_t pr,
+                            uint32_t addr, uint32_t i, const char *name);
 int lan9662_ib_debug_print(struct lan9662_rte_inst *inst,
                            const lan9662_debug_printf_t pr,
                            const lan9662_debug_info_t   *const info);

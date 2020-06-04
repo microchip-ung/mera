@@ -100,9 +100,6 @@ $methods_blacklist = [
     "lan9662_callout_trace_printf",
     "lan9662_debug_info_get",
     "lan9662_debug_info_print",
-    "lan9662_rte_ob_rtp_conf_set",
-    "lan9662_rte_ob_rtp_pdu_to_dg_add",
-    "lan9662_rte_ob_rtp_pdu_to_dg_clr",
     "lan9662_rte_ob_dg_data_get",
     "lan9662_rte_ob_dg_data_bulk_get",
 ]
