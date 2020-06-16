@@ -29,10 +29,15 @@ typedef struct {
 } lan9662_rte_gen_t;
 
 // One more entry for direct 1-based indexing
-#define RTE_OB_RTP_CNT (LAN9662_RTE_RTP_CNT + 1)
-#define RTE_OB_DG_CNT  (LAN9662_RTE_RTP_CNT + 1)
+#define RTE_RTP_CNT    (LAN9662_RTE_RTP_CNT + 1)
+#define RTE_OB_RTP_CNT RTE_RTP_CNT
+#define RTE_OB_DG_CNT  RTE_RTP_CNT
+#define RTE_IB_RTP_CNT RTE_RTP_CNT
 
-// RTP entry
+// Convert time in nsec to RUT (50 nsec)
+#define LAN9662_RUT_TIME(t_nsec) ((t_nsec) / 50)
+
+// RTP OB entry
 typedef struct {
     lan9662_rte_ob_rtp_conf_t conf; // Configuration
     uint16_t                  addr; // First address
@@ -51,14 +56,28 @@ typedef struct {
     lan9662_rte_ob_dg_entry_t  dg_tbl[RTE_OB_DG_CNT];
 } lan9662_rte_ob_t;
 
+// RTP IB entry
+typedef struct {
+    lan9662_rte_ib_rtp_conf_t conf; // Configuration
+} lan9662_rte_ib_rtp_entry_t;
+
+// RTE IB state
+typedef struct {
+    uint32_t                   frm_data_addr;
+    lan9662_rte_ib_rtp_entry_t rtp_tbl[RTE_IB_RTP_CNT];
+} lan9662_rte_ib_t;
+
 // RTE state
 typedef struct lan9662_rte_inst {
     lan9662_rte_cb_t  cb;
     lan9662_rte_gen_t gen;
     lan9662_rte_ob_t  ob;
+    lan9662_rte_ib_t  ib;
 } lan9662_rte_inst_t;
 
 struct lan9662_rte_inst *lan9662_inst_get(struct lan9662_rte_inst *inst);
+
+int lan9662_rte_rtp_check(uint16_t rtp_id);
 
 /* ================================================================= *
  *  Register access
@@ -201,7 +220,10 @@ extern lan9662_trace_conf_t lan9662_trace_conf[];
  *  Debug print
  * ================================================================= */
 
+void lan9662_debug_print_header(const lan9662_debug_printf_t pr,
+                                const char                   *header);
 void lan9662_debug_print_reg_header(const lan9662_debug_printf_t pr, const char *name);
+void lan9662_debug_print_reg(const lan9662_debug_printf_t pr, const char *name, uint32_t value);
 void lan9662_debug_reg(struct lan9662_rte_inst *inst,
                        const lan9662_debug_printf_t pr, uint32_t addr, const char *name);
 void lan9662_debug_reg_inst(struct lan9662_rte_inst *inst,

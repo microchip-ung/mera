@@ -29,6 +29,8 @@ struct lan9662_rte_inst *lan9662_rte_create(const lan9662_rte_cb_t *cb);
 
 void lan9662_rte_destroy(struct lan9662_rte_inst *inst);
 
+/* - RTE general --------------------------------------------------- */
+
 // RTE general configuration
 typedef struct {
     lan9662_bool_t enable; // Enable/disable RTE
@@ -45,18 +47,21 @@ int lan9662_rte_gen_conf_get(struct lan9662_rte_inst *inst,
 int lan9662_rte_gen_conf_set(struct lan9662_rte_inst      *inst,
                              const lan9662_rte_gen_conf_t *const conf);
 
+/* - RTE Outbound -------------------------------------------------- */
+
 // Number of 1-based RTP IDs
 #define LAN9662_RTE_RTP_CNT 31
 
 // RTP entry type
 typedef enum {
-    LAN9662_RTE_OB_RTP_TYPE_DISABLED, // Disabled
-    LAN9662_RTE_OB_RTP_TYPE_PN,       // Profinet
-    LAN9662_RTE_OB_RTP_TYPE_OPC_UA,   // OPC-UA
-} lan9662_rte_ob_rtp_type_t;
+    LAN9662_RTP_TYPE_DISABLED, // Disabled
+    LAN9662_RTP_TYPE_PN,       // Profinet
+    LAN9662_RTP_TYPE_OPC_UA,   // OPC-UA
+} lan9662_rtp_type_t;
 
+// RTP Outbound configuration
 typedef struct {
-    lan9662_rte_ob_rtp_type_t type;
+    lan9662_rtp_type_t type;
 
     // Invoke the write_actions directly after frame has been processed, instead
     // of waiting for time to trigger.
@@ -67,12 +72,12 @@ typedef struct {
 
 } lan9662_rte_ob_rtp_conf_t;
 
-// Get RTP configuration
+// Get RTP Outbound configuration
 int lan9662_rte_ob_rtp_conf_get(struct lan9662_rte_inst   *inst,
                                 uint16_t                  rtp_id,
                                 lan9662_rte_ob_rtp_conf_t *const conf);
 
-// Set RTP configuration
+// Set RTP Outbound configuration
 int lan9662_rte_ob_rtp_conf_set(struct lan9662_rte_inst        *inst,
                                 uint16_t                        rtp_id,
                                 const lan9662_rte_ob_rtp_conf_t *const conf);
@@ -111,6 +116,30 @@ int lan9662_rte_ob_dg_data_bulk_get(struct lan9662_rte_inst      *inst,
 
 // TODO: Once we can find the PDU data in the DG memory, then we need to
 // continue and do the 3-buffer operation
+
+/* - RTE Inbound --------------------------------------------------- */
+
+// Maximum size of frame data
+#define LAN9662_FRAME_DATA_CNT 1514
+
+// RTP Inbound configuration
+typedef struct {
+    lan9662_rtp_type_t type;   // Type
+    uint32_t           time;   // Cycle time [nsec]
+    uint16_t           port;   // Egress chip port
+    uint16_t           length; // Frame length (excluding IFH and FCS)
+    uint8_t            data[LAN9662_FRAME_DATA_CNT]; // Frame data
+} lan9662_rte_ib_rtp_conf_t;
+
+// Get RTP Outbound configuration
+int lan9662_rte_ib_rtp_conf_get(struct lan9662_rte_inst   *inst,
+                                uint16_t                  rtp_id,
+                                lan9662_rte_ib_rtp_conf_t *const conf);
+
+// Set RTP Outbound configuration
+int lan9662_rte_ib_rtp_conf_set(struct lan9662_rte_inst        *inst,
+                                uint16_t                        rtp_id,
+                                const lan9662_rte_ib_rtp_conf_t *const conf);
 
 /* - Trace --------------------------------------------------------- */
 

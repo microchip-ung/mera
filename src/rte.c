@@ -157,6 +157,11 @@ int lan9662_rte_gen_conf_set(struct lan9662_rte_inst      *inst,
     T_I("enter");
     inst = lan9662_inst_get(inst);
     inst->gen.conf = *conf;
+    REG_WR(RTE_OUTB_RTP_STATE, 0xffffffff);
+    REG_WR(RTE_RTE_CFG, RTE_RTE_CFG_RTE_ENA(conf->enable ? 1 : 0));
+    REG_WR(RTE_OUTB_CFG, RTE_OUTB_CFG_OUTB_PORT(4));
+    REG_WR(RTE_SC_LEN, RTE_SC_LEN_SC_LEN(20000000)); // 20.000.000 x 50 nsec = 1 sec
+    REG_WR(RTE_SC_RESET, RTE_SC_RESET_SC_RESET_TIME_NS(1));
     return 0;
 }
 
@@ -175,7 +180,7 @@ void lan9662_debug_print_reg_header(const lan9662_debug_printf_t pr, const char 
     pr("%-20s  31    24.23    16.15     8.7      0  Hex         Decimal\n", name);
 }
 
-static void lan9662_debug_print_reg(const lan9662_debug_printf_t pr, const char *name, uint32_t value)
+void lan9662_debug_print_reg(const lan9662_debug_printf_t pr, const char *name, uint32_t value)
 {
     uint32_t i;
 
@@ -210,12 +215,37 @@ static int lan9662_gen_debug_print(struct lan9662_rte_inst *inst,
                                    const lan9662_debug_printf_t pr,
                                    const lan9662_debug_info_t   *const info)
 {
+    uint32_t value;
+
+    lan9662_debug_print_header(pr, "RTE General State");
+    pr("RTE State: %s\n\n", inst->gen.conf.enable ? "Enabled" : "Disabled");
+
+    lan9662_debug_print_header(pr, "RTE General Registers");
     lan9662_debug_print_reg_header(pr, "RTE General");
     lan9662_debug_reg(inst, pr, REG_ADDR(RTE_RTE_CFG), "RTE_CFG");
     lan9662_debug_reg(inst, pr, REG_ADDR(RTE_RUT), "RUT");
+    lan9662_debug_reg(inst, pr, REG_ADDR(RTE_SC_LEN), "SC_LEN");
+    REG_RD(RTE_SC_TIME, &value);
+    lan9662_debug_print_reg(pr, "SC_TIME", value);
+    lan9662_debug_print_reg(pr, ":SC_RUT_CNT", RTE_SC_TIME_SC_RUT_CNT_X(value));
+    lan9662_debug_print_reg(pr, ":SC_IDX", RTE_SC_TIME_SC_IDX_X(value));
+    value = (RTE_SC_TIME_SC_IDX_X(value) * (RTE_SC_TIME_SC_RUT_CNT_M + 1) + RTE_SC_TIME_SC_RUT_CNT_X(value));
+    lan9662_debug_print_reg(pr, ":SC_IDX:SC_RUT_CNT", value);
     pr("\n");
 
     return 0;
+}
+
+void lan9662_debug_print_header(const lan9662_debug_printf_t pr,
+                                const char *header)
+{
+    int i, len = strlen(header);
+
+    pr("%s\n", header);
+    for (i = 0; i < len; i++) {
+        pr("=");
+    }
+    pr("\n\n");
 }
 
 int lan9662_debug_info_print(struct lan9662_rte_inst *inst,

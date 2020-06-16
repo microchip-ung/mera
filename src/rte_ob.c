@@ -10,7 +10,7 @@ int lan9662_ob_init(struct lan9662_rte_inst *inst)
     return 0;
 }
 
-static int lan9662_ob_rtp_check(uint32_t rtp_id)
+int lan9662_rte_rtp_check(uint16_t rtp_id)
 {
     if (rtp_id == 0 || rtp_id >= LAN9662_RTE_RTP_CNT) {
         T_E("illegal rtp_id: %u", rtp_id);
@@ -25,7 +25,7 @@ int lan9662_rte_ob_rtp_conf_get(struct lan9662_rte_inst   *inst,
 {
     T_I("enter");
     inst = lan9662_inst_get(inst);
-    LAN9662_RC(lan9662_ob_rtp_check(rtp_id));
+    LAN9662_RC(lan9662_rte_rtp_check(rtp_id));
     *conf = inst->ob.rtp_tbl[rtp_id].conf;
     return 0;
 }
@@ -34,20 +34,22 @@ int lan9662_rte_ob_rtp_conf_set(struct lan9662_rte_inst        *inst,
                                 uint16_t                        rtp_id,
                                 const lan9662_rte_ob_rtp_conf_t *const conf)
 {
-    uint32_t type = (conf->type == LAN9662_RTE_OB_RTP_TYPE_OPC_UA ? 1 : 0);
-    uint32_t ena = (conf->type == LAN9662_RTE_OB_RTP_TYPE_DISABLED ? 0 : 1);
+    uint32_t type = (conf->type == LAN9662_RTP_TYPE_OPC_UA ? 1 : 0);
+    uint32_t ena = (conf->type == LAN9662_RTP_TYPE_DISABLED ? 0 : 1);
 
     T_I("enter");
     inst = lan9662_inst_get(inst);
-    LAN9662_RC(lan9662_ob_rtp_check(rtp_id));
+    LAN9662_RC(lan9662_rte_rtp_check(rtp_id));
     inst->ob.rtp_tbl[rtp_id].conf = *conf;
     REG_WR(RTE_OUTB_RTP_MISC(rtp_id),
            RTE_OUTB_RTP_MISC_RTP_GRP_ID(0) |
            RTE_OUTB_RTP_MISC_PDU_TYPE(type) |
            RTE_OUTB_RTP_MISC_RTP_ENA(ena) |
-           RTE_OUTB_RTP_MISC_RTP_GRP_STATE_STOPPED_MODE(0) |
-           RTE_OUTB_RTP_MISC_DG_DATA_CP_ENA(1) |
+           RTE_OUTB_RTP_MISC_RTP_GRP_STATE_STOPPED_MODE(1) |
+           RTE_OUTB_RTP_MISC_DG_DATA_CP_ENA(0) |
            RTE_OUTB_RTP_MISC_WR_ACTION_ADDR(0));
+    REG_WR(RTE_OUTB_RTP_PDU_CHKS(rtp_id),
+           RTE_OUTB_RTP_PDU_CHKS_PDU_LEN(1));
     return 0;
 }
 
@@ -68,7 +70,7 @@ int lan9662_rte_ob_rtp_pdu2dg_add(struct lan9662_rte_inst                *inst,
 
     T_I("enter");
     inst = lan9662_inst_get(inst);
-    LAN9662_RC(lan9662_ob_rtp_check(rtp_id));
+    LAN9662_RC(lan9662_rte_rtp_check(rtp_id));
 
     // Find free DG entry
     ob = &inst->ob;
@@ -138,6 +140,30 @@ int lan9662_rte_ob_rtp_pdu2dg_add(struct lan9662_rte_inst                *inst,
 int lan9662_rte_ob_rtp_pdu2dg_clr(struct lan9662_rte_inst *inst,
                                   uint16_t                rtp_id)
 {
+    lan9662_rte_ob_t           *ob;
+    lan9662_rte_ob_dg_entry_t  *dg;
+    lan9662_rte_ob_rtp_entry_t *rtp;
+    uint16_t                   i, addr, prev_addr;
+
+    T_I("enter");
+    inst = lan9662_inst_get(inst);
+    LAN9662_RC(lan9662_rte_rtp_check(rtp_id));
+
+    // Clear list in state and hardware
+    ob = &inst->ob;
+    rtp = &ob->rtp_tbl[rtp_id];
+    for (i = 0, addr = rtp->addr, prev_addr = addr; addr != 0; i++) {
+        if (i < 3) {
+            REG_WR(RTE_OUTB_DG_ADDR(rtp_id, i), RTE_OUTB_DG_ADDR_DG_ADDR(0));
+        } else {
+            REG_WR(RTE_OUTB_DG_MISC(prev_addr), RTE_OUTB_DG_MISC_DG_ADDR(0));
+            prev_addr = ob->dg_tbl[prev_addr].addr;
+        }
+        dg = &ob->dg_tbl[addr];
+        dg->rtp_id = 0;
+        addr = dg->addr;
+    }
+    rtp->addr = 0;
     return 0;
 }
 
@@ -153,14 +179,15 @@ int lan9662_ob_debug_print(struct lan9662_rte_inst *inst,
     uint16_t                   i, j, addr;
     char                       buf[32];
 
+    lan9662_debug_print_header(pr, "RTE Outbound State");
     for (i = 1; i < RTE_OB_RTP_CNT; i++) {
         rtp = &ob->rtp_tbl[i];
         addr = rtp->addr;
         switch (rtp->conf.type) {
-        case LAN9662_RTE_OB_RTP_TYPE_PN:
+        case LAN9662_RTP_TYPE_PN:
             txt = "Profinet";
             break;
-        case LAN9662_RTE_OB_RTP_TYPE_OPC_UA:
+        case LAN9662_RTP_TYPE_OPC_UA:
             txt = "OPC-UA";
             break;
         default:
@@ -184,8 +211,11 @@ int lan9662_ob_debug_print(struct lan9662_rte_inst *inst,
         pr("\n");
     }
 
+    lan9662_debug_print_header(pr, "RTE Outbound Registers");
     lan9662_debug_print_reg_header(pr, "RTE Outbound");
     lan9662_debug_reg(inst, pr, REG_ADDR(RTE_OUTB_CFG), "OUTB_CFG");
+    lan9662_debug_reg(inst, pr, REG_ADDR(RTE_OUTB_RTP_STATE), "OUTB_RTP_STATE");
+    lan9662_debug_reg(inst, pr, REG_ADDR(RTE_OUTB_STICKY_BITS), "STICKY_BITS");
     pr("\n");
 
     for (i = 1; i < RTE_OB_RTP_CNT; i++) {
@@ -201,6 +231,7 @@ int lan9662_ob_debug_print(struct lan9662_rte_inst *inst,
                                    REG_ADDR(RTE_OUTB_DG_ADDR(i, j)), j, "DG_ADDR");
         }
         lan9662_debug_reg(inst, pr, REG_ADDR(RTE_OUTB_PDU_RECV_CNT(i)), "PDU_RECV_CNT");
+        lan9662_debug_reg(inst, pr, REG_ADDR(RTE_OUTB_RTP_STICKY_BITS(i)), "STICKY_BITS");
         pr("\n");
     }
 
