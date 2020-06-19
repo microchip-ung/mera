@@ -12,7 +12,7 @@ int lan9662_ob_init(struct lan9662_rte_inst *inst)
 
 int lan9662_rte_rtp_check(uint16_t rtp_id)
 {
-    if (rtp_id == 0 || rtp_id >= LAN9662_RTE_RTP_CNT) {
+    if (rtp_id == 0 || rtp_id > LAN9662_RTE_RTP_CNT) {
         T_E("illegal rtp_id: %u", rtp_id);
         return -1;
     }
@@ -20,7 +20,7 @@ int lan9662_rte_rtp_check(uint16_t rtp_id)
 }
 
 int lan9662_rte_ob_rtp_conf_get(struct lan9662_rte_inst   *inst,
-                                uint16_t                  rtp_id,
+                                const uint16_t            rtp_id,
                                 lan9662_rte_ob_rtp_conf_t *const conf)
 {
     T_I("enter");
@@ -30,8 +30,8 @@ int lan9662_rte_ob_rtp_conf_get(struct lan9662_rte_inst   *inst,
     return 0;
 }
 
-int lan9662_rte_ob_rtp_conf_set(struct lan9662_rte_inst        *inst,
-                                uint16_t                        rtp_id,
+int lan9662_rte_ob_rtp_conf_set(struct lan9662_rte_inst         *inst,
+                                const uint16_t                  rtp_id,
                                 const lan9662_rte_ob_rtp_conf_t *const conf)
 {
     uint32_t type = (conf->type == LAN9662_RTP_TYPE_OPC_UA ? 1 : 0);
@@ -48,19 +48,27 @@ int lan9662_rte_ob_rtp_conf_set(struct lan9662_rte_inst        *inst,
            RTE_OUTB_RTP_MISC_RTP_GRP_STATE_STOPPED_MODE(1) |
            RTE_OUTB_RTP_MISC_DG_DATA_CP_ENA(0) |
            RTE_OUTB_RTP_MISC_WR_ACTION_ADDR(0));
+
+    // Disable data/transfer status checks
+    REG_WR(RTE_OUTB_PN_PDU_MISC,
+           RTE_OUTB_PN_PDU_MISC_PN_DATA_STATUS_MASK(0) |
+           RTE_OUTB_PN_PDU_MISC_PN_DATA_STATUS_VALID_CHK_ENA(0) |
+           RTE_OUTB_PN_PDU_MISC_PN_TRANSFER_STATUS_CHK_ENA(0));
+
+    // Disable PDU length check
     REG_WR(RTE_OUTB_RTP_PDU_CHKS(rtp_id),
-           RTE_OUTB_RTP_PDU_CHKS_PDU_LEN(1));
+           RTE_OUTB_RTP_PDU_CHKS_PDU_LEN(0));
     return 0;
 }
 
-int lan9662_rte_ob_rtp_pdu2dg_init(lan9662_rte_ob_rtp_pdu2dg_conf_t *conf)
+int lan9662_rte_ob_rtp_pdu2dg_init(lan9662_rte_ob_rtp_pdu2dg_conf_t *const conf)
 {
     memset(conf, 0, sizeof(*conf));
     return 0;
 }
 
 int lan9662_rte_ob_rtp_pdu2dg_add(struct lan9662_rte_inst                *inst,
-                                  uint16_t                               rtp_id,
+                                  const uint16_t                         rtp_id,
                                   const lan9662_rte_ob_rtp_pdu2dg_conf_t *conf)
 {
     lan9662_rte_ob_t           *ob;
@@ -138,7 +146,7 @@ int lan9662_rte_ob_rtp_pdu2dg_add(struct lan9662_rte_inst                *inst,
 }
 
 int lan9662_rte_ob_rtp_pdu2dg_clr(struct lan9662_rte_inst *inst,
-                                  uint16_t                rtp_id)
+                                  const uint16_t          rtp_id)
 {
     lan9662_rte_ob_t           *ob;
     lan9662_rte_ob_dg_entry_t  *dg;
@@ -167,6 +175,59 @@ int lan9662_rte_ob_rtp_pdu2dg_clr(struct lan9662_rte_inst *inst,
     return 0;
 }
 
+static int lan9662_rte_ob_rtp_counters_update(struct lan9662_rte_inst       *inst,
+                                              const uint16_t                rtp_id,
+                                              lan9662_rte_ob_rtp_counters_t *const counters,
+                                              int                           clear)
+{
+    lan9662_rte_ob_rtp_entry_t *rtp;
+    uint32_t                   value;
+
+    T_I("enter");
+    inst = lan9662_inst_get(inst);
+    LAN9662_RC(lan9662_rte_rtp_check(rtp_id));
+    rtp = &inst->ob.rtp_tbl[rtp_id];
+    if (rtp->conf.type != LAN9662_RTP_TYPE_DISABLED) {
+        REG_RD(RTE_OUTB_PDU_RECV_CNT(rtp_id), &value);
+        lan9662_rte_cnt_16_update(RTE_OUTB_PDU_RECV_CNT_PDU_RECV_CNT0_X(value), &rtp->rx_0, clear);
+        lan9662_rte_cnt_16_update(RTE_OUTB_PDU_RECV_CNT_PDU_RECV_CNT1_X(value), &rtp->rx_1, clear);
+        if (counters != NULL) {
+            counters->rx_0 = rtp->rx_0.value;
+            counters->rx_1 = rtp->rx_1.value;
+        }
+    }
+    return 0;
+}
+
+int lan9662_rte_ob_rtp_counters_get(struct lan9662_rte_inst       *inst,
+                                    const uint16_t                rtp_id,
+                                    lan9662_rte_ob_rtp_counters_t *const counters)
+{
+    return lan9662_rte_ob_rtp_counters_update(inst, rtp_id, counters, 0);
+}
+
+int lan9662_rte_ob_rtp_counters_clr(struct lan9662_rte_inst *inst,
+                                    const uint16_t          rtp_id)
+{
+    return lan9662_rte_ob_rtp_counters_update(inst, rtp_id, NULL, 1);
+}
+
+int lan9662_ob_poll(struct lan9662_rte_inst *inst)
+{
+    lan9662_rte_ob_t *ob = &inst->ob;
+    uint32_t         i;
+
+    T_I("enter");
+    for (i = 0; i < RTE_POLL_CNT; i++) {
+        ob->rtp_id++;
+        if (ob->rtp_id >= RTE_IB_RTP_CNT) {
+            ob->rtp_id = 1;
+        }
+        LAN9662_RC(lan9662_rte_ob_rtp_counters_update(inst, ob->rtp_id, NULL, 0));
+    }
+    return 0;
+}
+
 int lan9662_ob_debug_print(struct lan9662_rte_inst *inst,
                            const lan9662_debug_printf_t pr,
                            const lan9662_debug_info_t   *const info)
@@ -180,6 +241,8 @@ int lan9662_ob_debug_print(struct lan9662_rte_inst *inst,
     char                       buf[32];
 
     lan9662_debug_print_header(pr, "RTE Outbound State");
+    pr("Next RTP ID: %u\n\n", ob->rtp_id);
+
     for (i = 1; i < RTE_OB_RTP_CNT; i++) {
         rtp = &ob->rtp_tbl[i];
         addr = rtp->addr;
@@ -230,7 +293,10 @@ int lan9662_ob_debug_print(struct lan9662_rte_inst *inst,
             lan9662_debug_reg_inst(inst, pr,
                                    REG_ADDR(RTE_OUTB_DG_ADDR(i, j)), j, "DG_ADDR");
         }
-        lan9662_debug_reg(inst, pr, REG_ADDR(RTE_OUTB_PDU_RECV_CNT(i)), "PDU_RECV_CNT");
+        REG_RD(RTE_OUTB_PDU_RECV_CNT(i), &value);
+        lan9662_debug_print_reg(pr, "PDU_RECV_CNT", value);
+        lan9662_debug_print_reg(pr, ":CNT0", RTE_OUTB_PDU_RECV_CNT_PDU_RECV_CNT0_X(value));
+        lan9662_debug_print_reg(pr, ":CNT1", RTE_OUTB_PDU_RECV_CNT_PDU_RECV_CNT1_X(value));
         lan9662_debug_reg(inst, pr, REG_ADDR(RTE_OUTB_RTP_STICKY_BITS(i)), "STICKY_BITS");
         pr("\n");
     }

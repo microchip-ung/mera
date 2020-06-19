@@ -7,12 +7,11 @@
 int lan9662_ib_init(struct lan9662_rte_inst *inst)
 {
     T_I("enter");
-
     return 0;
 }
 
 int lan9662_rte_ib_rtp_conf_get(struct lan9662_rte_inst   *inst,
-                                uint16_t                  rtp_id,
+                                const uint16_t            rtp_id,
                                 lan9662_rte_ib_rtp_conf_t *const conf)
 {
     T_I("enter");
@@ -24,36 +23,36 @@ int lan9662_rte_ib_rtp_conf_get(struct lan9662_rte_inst   *inst,
 
 #define IFH_LEN 28
 
-int lan9662_rte_ib_rtp_conf_set(struct lan9662_rte_inst        *inst,
-                                uint16_t                        rtp_id,
+int lan9662_rte_ib_rtp_conf_set(struct lan9662_rte_inst         *inst,
+                                const uint16_t                  rtp_id,
                                 const lan9662_rte_ib_rtp_conf_t *const conf)
 {
-    lan9662_rte_ib_t           *ib;
-    lan9662_rte_ib_rtp_entry_t *rtp;
-    uint32_t type = (conf->type == LAN9662_RTP_TYPE_OPC_UA ? 1 : 0);
-    uint32_t ena = (conf->type == LAN9662_RTP_TYPE_DISABLED ? 0 : 1);
-    uint16_t len = (conf->length < 60 ? 60 : conf->length);
-    uint32_t i, j, k, m, addr, value;
+    lan9662_rte_ib_t *ib;
+    uint32_t         type = (conf->type == LAN9662_RTP_TYPE_OPC_UA ? 1 : 0);
+    uint32_t         ena = (conf->type == LAN9662_RTP_TYPE_DISABLED ? 0 : 1);
+    uint32_t         len = (conf->length < 60 ? 60 : conf->length);
+    uint32_t         inj = (conf->mode == LAN9662_RTP_IB_MODE_INJ ? 1 : 0);
+    uint32_t         i, j, k, m, addr, value, len_old, cnt, chg;
 
     T_I("enter");
     inst = lan9662_inst_get(inst);
     ib = &inst->ib;
     LAN9662_RC(lan9662_rte_rtp_check(rtp_id));
+
+    // Check frame length
     if (len > LAN9662_FRAME_DATA_CNT) {
         T_E("illegal length: %u", len);
         return -1;
     }
     len += (IFH_LEN + 4);
-    rtp = &ib->rtp_tbl[rtp_id];
-    if (rtp->conf.type != LAN9662_RTP_TYPE_DISABLED) {
-        T_E("changing existing RTP is not allowed");
+    REG_RD(RTE_INB_RTP_FRM_PORT(rtp_id), &value);
+    len_old = RTE_INB_RTP_FRM_PORT_FRM_LEN_X(value);
+    if (len_old != 0 && len_old != len) {
+        T_E("length can not be changed");
         return -1;
     }
-    if (!ena) {
-        T_E("RTP must be enabled");
-        return -1;
-    }
-    rtp->conf = *conf;
+
+    ib->rtp_tbl[rtp_id].conf = *conf;
     REG_WR(RTE_INB_RTP_FRM_PORT(rtp_id),
            RTE_INB_RTP_FRM_PORT_FRM_LEN(len) |
            RTE_INB_RTP_FRM_PORT_PORT_NUM(conf->port));
@@ -64,9 +63,19 @@ int lan9662_rte_ib_rtp_conf_set(struct lan9662_rte_inst        *inst,
            RTE_INB_RTP_MISC_LAST_FRM_UPD_CNT(0) |
            RTE_INB_RTP_MISC_OTF_TIMER_RESTART_ENA(0) |
            RTE_INB_RTP_MISC_RTP_GRP_ID(0));
-    REG_WR(RTE_INB_RTP_ADDRS(rtp_id),
-           RTE_INB_RTP_ADDRS_FRM_DATA_ADDR(ib->frm_data_addr) |
-           RTE_INB_RTP_ADDRS_REDUN_ADDR(0));
+    cnt = ((len + 31) / 32);
+    if (len_old == 0) {
+        // Allocate new frame data address
+        addr = ib->frm_data_addr;
+        ib->frm_data_addr += cnt;
+        REG_WR(RTE_INB_RTP_ADDRS(rtp_id),
+               RTE_INB_RTP_ADDRS_FRM_DATA_ADDR(addr) |
+               RTE_INB_RTP_ADDRS_REDUN_ADDR(0));
+    } else {
+        // Reuse existing frame data address
+        REG_RD(RTE_INB_RTP_ADDRS(rtp_id), &value);
+        addr = RTE_INB_RTP_ADDRS_FRM_DATA_ADDR_X(value);
+    }
 
     // If conf->time is zero, it is a one-shot and we set FIRST to delay the frame.
     // The delayed one-shot frame is a test feature.
@@ -76,33 +85,92 @@ int lan9662_rte_ib_rtp_conf_set(struct lan9662_rte_inst        *inst,
     REG_WR(RTE_INB_RTP_TIMER_CFG2(rtp_id),
            RTE_INB_RTP_TIMER_CFG2_DELTA_RUT_CNT(LAN9662_RUT_TIME(conf->time)));
     REG_WR(RTE_INB_TIMER_CMD,
-           RTE_INB_TIMER_CMD_TIMER_CMD(ena ? 2 : 1) |
+           RTE_INB_TIMER_CMD_TIMER_CMD(ena && inj ? 2 : 1) |
            RTE_INB_TIMER_CMD_TIMER_RSLT(0) |
            RTE_INB_TIMER_CMD_TIMER_TYPE(0) |
            RTE_INB_TIMER_CMD_TIMER_IDX(rtp_id));
 
     // Frame data
-    for (i = 0; i < len; i += 32) {
-        addr = ib->frm_data_addr;
-        ib->frm_data_addr++;
+    for (i = 0; i < cnt; i++, addr++) {
         REG_WR(RTE_INB_FRM_DATA_CHG_ADDR, addr);
-        REG_WR(RTE_INB_FRM_DATA_CHG_BYTE, 0xffffffff);
         REG_WR(RTE_INB_FRM_DATA_ADDR, RTE_INB_FRM_DATA_ADDR_FRM_DATA_ADDR(addr));
         REG_WR(RTE_INB_FRM_DATA_WR_MASK, 0xffffffff);
+        chg = 0;
         for (j = 0; j < 8; j++) {
             value = 0;
-            k = (i + j * 4);
+            k = (i * 32 + j * 4);
             if (k >= IFH_LEN) {
                 k -= IFH_LEN;
                 for (m = 0; m < 4; m++, k++) {
                     value <<= 8;
                     if (k < conf->length) {
                         value += conf->data[k];
+                        if (inj || conf->update[k]) {
+                             chg |= (1 << (j * 4 + m));
+                        }
                     }
                 }
             }
             REG_WR(RTE_INB_FRM_DATA(0, j), value);
         }
+        REG_WR(RTE_INB_FRM_DATA_CHG_BYTE, chg);
+    }
+
+    return 0;
+}
+
+static int lan9662_rte_ib_rtp_counters_update(struct lan9662_rte_inst       *inst,
+                                              const uint16_t                rtp_id,
+                                              lan9662_rte_ib_rtp_counters_t *const counters,
+                                              int                           clear)
+{
+    lan9662_rte_ib_rtp_entry_t *rtp;
+    uint32_t                   value;
+
+    rtp = &inst->ib.rtp_tbl[rtp_id];
+    if (rtp->conf.type != LAN9662_RTP_TYPE_DISABLED) {
+        REG_RD(RTE_INB_RTP_CNT(rtp_id), &value);
+        lan9662_rte_cnt_16_update(RTE_INB_RTP_CNT_FRM_OTF_CNT_X(value), &rtp->tx_otf, clear);
+        lan9662_rte_cnt_16_update(RTE_INB_RTP_CNT_FRM_INJ_CNT_X(value), &rtp->tx_inj, clear);
+    }
+    if (counters != NULL) {
+        counters->tx_otf = rtp->tx_otf.value;
+        counters->tx_inj = rtp->tx_inj.value;
+    }
+    return 0;
+}
+
+int lan9662_rte_ib_rtp_counters_get(struct lan9662_rte_inst       *inst,
+                                    const uint16_t                rtp_id,
+                                    lan9662_rte_ib_rtp_counters_t *const counters)
+{
+    T_I("enter");
+    inst = lan9662_inst_get(inst);
+    LAN9662_RC(lan9662_rte_rtp_check(rtp_id));
+    return lan9662_rte_ib_rtp_counters_update(inst, rtp_id, counters, 0);
+}
+
+int lan9662_rte_ib_rtp_counters_clr(struct lan9662_rte_inst *inst,
+                                    const uint16_t          rtp_id)
+{
+    T_I("enter");
+    inst = lan9662_inst_get(inst);
+    LAN9662_RC(lan9662_rte_rtp_check(rtp_id));
+    return lan9662_rte_ib_rtp_counters_update(inst, rtp_id, NULL, 1);
+}
+
+int lan9662_ib_poll(struct lan9662_rte_inst *inst)
+{
+    lan9662_rte_ib_t *ib = &inst->ib;
+    uint32_t         i;
+
+    T_I("enter");
+    for (i = 0; i < RTE_POLL_CNT; i++) {
+        ib->rtp_id++;
+        if (ib->rtp_id >= RTE_IB_RTP_CNT) {
+            ib->rtp_id = 1;
+        }
+        LAN9662_RC(lan9662_rte_ib_rtp_counters_update(inst, ib->rtp_id, NULL, 0));
     }
     return 0;
 }
@@ -118,8 +186,9 @@ int lan9662_ib_debug_print(struct lan9662_rte_inst *inst,
     char                       buf[32];
 
     lan9662_debug_print_header(pr, "RTE Inbound State");
+    pr("Next RTP ID    : %u\n", ib->rtp_id);
     addr = ib->frm_data_addr;
-    pr("Frame Data Addr: %u (%u bytes)\n\n", addr, addr * 32);
+    pr("Frame Data Addr: %u (%u bytes used)\n\n", addr, addr * 32);
 
     for (i = 1; i < RTE_OB_RTP_CNT; i++) {
         rtp = &ib->rtp_tbl[i];
@@ -139,6 +208,7 @@ int lan9662_ib_debug_print(struct lan9662_rte_inst *inst,
         }
         pr("RTP ID: %u\n", i);
         pr("Type  : %s\n", txt);
+        pr("Mode  : %s\n", rtp->conf.mode == LAN9662_RTP_IB_MODE_INJ ? "INJ" : "OTF");
         pr("Time  : %u.%03u usec\n", rtp->conf.time / 1000, rtp->conf.time % 1000);
         len = rtp->conf.length;
         pr("Length: %u\n", len);
@@ -195,9 +265,9 @@ int lan9662_ib_debug_print(struct lan9662_rte_inst *inst,
         }
         for (j = 0; j < len; j += 32) {
             addr = (base + j / 32);
+            REG_WR(RTE_INB_FRM_DATA_ADDR, RTE_INB_FRM_DATA_ADDR_FRM_DATA_ADDR(addr));
             REG_WR(RTE_INB_FRM_DATA_CHG_ADDR, addr);
             REG_RD(RTE_INB_FRM_DATA_CHG_BYTE, &chg);
-            REG_WR(RTE_INB_FRM_DATA_ADDR, RTE_INB_FRM_DATA_ADDR_FRM_DATA_ADDR(addr));
             pr("%04x: ", addr);
             for (k = 0; k < 8; k++) {
                 REG_RD(RTE_INB_FRM_DATA(0, k), &value);

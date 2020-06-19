@@ -165,6 +165,32 @@ int lan9662_rte_gen_conf_set(struct lan9662_rte_inst      *inst,
     return 0;
 }
 
+int lan9662_rte_poll(struct lan9662_rte_inst *inst)
+{
+    T_I("enter");
+    inst = lan9662_inst_get(inst);
+    LAN9662_RC(lan9662_ib_poll(inst));
+    LAN9662_RC(lan9662_ob_poll(inst));
+    return 0;
+}
+
+void lan9662_rte_cnt_16_update(uint16_t value, lan9662_rte_counter_t *counter, int clear)
+{
+    uint64_t add = 0;
+
+    if (clear) {
+        // Clear counter
+        counter->value = 0;
+    } else {
+        // Accumulate counter
+        if (value < counter->prev) {
+            add = (1ULL << 16); /* Wrapped */
+        }
+        counter->value += (value + add - counter->prev);
+    }
+    counter->prev = value;
+}
+
 /* ================================================================= *
  *  Debug print
  * ================================================================= */

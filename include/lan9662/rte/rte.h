@@ -34,7 +34,6 @@ void lan9662_rte_destroy(struct lan9662_rte_inst *inst);
 // RTE general configuration
 typedef struct {
     lan9662_bool_t enable; // Enable/disable RTE
-    // TODO, configure port RTE:OUTB_MISC:OUTB_CFG.OUTB_PORT
 } lan9662_rte_gen_conf_t;
 
 // Get RTE general configuration.
@@ -47,7 +46,9 @@ int lan9662_rte_gen_conf_get(struct lan9662_rte_inst *inst,
 int lan9662_rte_gen_conf_set(struct lan9662_rte_inst      *inst,
                              const lan9662_rte_gen_conf_t *const conf);
 
-/* - RTE Outbound -------------------------------------------------- */
+
+// Poll statistics, call approximately every second
+int lan9662_rte_poll(struct lan9662_rte_inst *inst);
 
 // Number of 1-based RTP IDs
 #define LAN9662_RTE_RTP_CNT 31
@@ -58,6 +59,8 @@ typedef enum {
     LAN9662_RTP_TYPE_PN,       // Profinet
     LAN9662_RTP_TYPE_OPC_UA,   // OPC-UA
 } lan9662_rtp_type_t;
+
+/* - RTE Outbound -------------------------------------------------- */
 
 // RTP Outbound configuration
 typedef struct {
@@ -74,12 +77,12 @@ typedef struct {
 
 // Get RTP Outbound configuration
 int lan9662_rte_ob_rtp_conf_get(struct lan9662_rte_inst   *inst,
-                                uint16_t                  rtp_id,
+                                const uint16_t            rtp_id,
                                 lan9662_rte_ob_rtp_conf_t *const conf);
 
 // Set RTP Outbound configuration
 int lan9662_rte_ob_rtp_conf_set(struct lan9662_rte_inst        *inst,
-                                uint16_t                        rtp_id,
+                                const uint16_t                 rtp_id,
                                 const lan9662_rte_ob_rtp_conf_t *const conf);
 
 // RTP PDU-to-DG configuration
@@ -90,16 +93,16 @@ typedef struct {
 } lan9662_rte_ob_rtp_pdu2dg_conf_t;
 
 // Initalize PDU-to-DG configuration
-int lan9662_rte_ob_rtp_pdu2dg_init(lan9662_rte_ob_rtp_pdu2dg_conf_t *conf);
+int lan9662_rte_ob_rtp_pdu2dg_init(lan9662_rte_ob_rtp_pdu2dg_conf_t *const conf);
 
 // Add PDU-to-DG configuration
 int lan9662_rte_ob_rtp_pdu2dg_add(struct lan9662_rte_inst                *inst,
-                                  uint16_t                               rtp_id,
-                                  const lan9662_rte_ob_rtp_pdu2dg_conf_t *conf);
+                                  const uint16_t                         rtp_id,
+                                  const lan9662_rte_ob_rtp_pdu2dg_conf_t *const conf);
 
 // Clear all PDU-to-DG entries
 int lan9662_rte_ob_rtp_pdu2dg_clr(struct lan9662_rte_inst *inst,
-                                  uint16_t                rtp_id);
+                                  const uint16_t          rtp_id);
 
 // For debugging only. Notice that it is a 2-buffer system from pdu to dg,
 // meaning that we need to use RTE:OUTB_DG_DATA_RTP_CTRL:OUTB_DG_DATA_RTP_CTRL
@@ -117,29 +120,63 @@ int lan9662_rte_ob_dg_data_bulk_get(struct lan9662_rte_inst      *inst,
 // TODO: Once we can find the PDU data in the DG memory, then we need to
 // continue and do the 3-buffer operation
 
+// Outbound counters
+typedef struct {
+    uint64_t rx_0; // Received PDUs with sub_id zero
+    uint64_t rx_1; // Received PDUs with sub_id one
+} lan9662_rte_ob_rtp_counters_t;
+
+int lan9662_rte_ob_rtp_counters_get(struct lan9662_rte_inst       *inst,
+                                    const uint16_t                rtp_id,
+                                    lan9662_rte_ob_rtp_counters_t *const counters);
+
+int lan9662_rte_ob_rtp_counters_clr(struct lan9662_rte_inst *inst,
+                                    const uint16_t          rtp_id);
+
 /* - RTE Inbound --------------------------------------------------- */
+
+// Inbound mode
+typedef enum {
+    LAN9662_RTP_IB_MODE_INJ, // Frame injection
+    LAN9662_RTP_IB_MODE_OTF, // On the fly frame processing
+} lan9662_rtp_ib_mode_t;
 
 // Maximum size of frame data
 #define LAN9662_FRAME_DATA_CNT 1514
 
 // RTP Inbound configuration
 typedef struct {
-    lan9662_rtp_type_t type;   // Type
-    uint32_t           time;   // Cycle time [nsec]
-    uint16_t           port;   // Egress chip port
-    uint16_t           length; // Frame length (excluding IFH and FCS)
-    uint8_t            data[LAN9662_FRAME_DATA_CNT]; // Frame data
+    lan9662_rtp_type_t    type;   // Type
+    lan9662_rtp_ib_mode_t mode;   // Mode
+    uint32_t              time;   // Cycle time [nsec] (INJ mode)
+    uint16_t              port;   // Egress chip port (INJ mode)
+    uint16_t              length; // Frame length (excluding IFH and FCS)
+    uint8_t               data[LAN9662_FRAME_DATA_CNT];   // Frame data
+    uint8_t               update[LAN9662_FRAME_DATA_CNT]; // Frame update, if non-zero (OTF mode)
 } lan9662_rte_ib_rtp_conf_t;
 
 // Get RTP Outbound configuration
 int lan9662_rte_ib_rtp_conf_get(struct lan9662_rte_inst   *inst,
-                                uint16_t                  rtp_id,
+                                const uint16_t            rtp_id,
                                 lan9662_rte_ib_rtp_conf_t *const conf);
 
 // Set RTP Outbound configuration
-int lan9662_rte_ib_rtp_conf_set(struct lan9662_rte_inst        *inst,
-                                uint16_t                        rtp_id,
+int lan9662_rte_ib_rtp_conf_set(struct lan9662_rte_inst         *inst,
+                                const uint16_t                  rtp_id,
                                 const lan9662_rte_ib_rtp_conf_t *const conf);
+
+// Inbound counters
+typedef struct {
+    uint64_t tx_inj; // Tx injected frames
+    uint64_t tx_otf; // Tx on the fly frames
+} lan9662_rte_ib_rtp_counters_t;
+
+int lan9662_rte_ib_rtp_counters_get(struct lan9662_rte_inst       *inst,
+                                    const uint16_t                rtp_id,
+                                    lan9662_rte_ib_rtp_counters_t *const counters);
+
+int lan9662_rte_ib_rtp_counters_clr(struct lan9662_rte_inst *inst,
+                                    const uint16_t          rtp_id);
 
 /* - Trace --------------------------------------------------------- */
 

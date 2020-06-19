@@ -262,6 +262,7 @@ int main(int argc, char **argv)
             poll_cnt = 0;
             init.cmd = MSCC_INIT_CMD_POLL;
             init_modules(&init);
+            lan9662_rte_poll(NULL);
         }
     }
     return 0;

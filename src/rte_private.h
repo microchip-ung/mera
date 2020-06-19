@@ -34,13 +34,24 @@ typedef struct {
 #define RTE_OB_DG_CNT  RTE_RTP_CNT
 #define RTE_IB_RTP_CNT RTE_RTP_CNT
 
+// Number of RTPs to poll every second to avoid multiple wrap arounds of 16-bit counters.
+// Minimum cycle time is 200 usec, giving 5000 pps, or 13 seconds to wrap.
+#define RTE_POLL_CNT   (RTE_RTP_CNT / 13)
+
 // Convert time in nsec to RUT (50 nsec)
 #define LAN9662_RUT_TIME(t_nsec) ((t_nsec) / 50)
+
+typedef struct {
+    uint16_t prev;  // Previous value
+    uint64_t value; // Accumulated value (64 bits)
+} lan9662_rte_counter_t;
 
 // RTP OB entry
 typedef struct {
     lan9662_rte_ob_rtp_conf_t conf; // Configuration
     uint16_t                  addr; // First address
+    lan9662_rte_counter_t     rx_0;
+    lan9662_rte_counter_t     rx_1;
 } lan9662_rte_ob_rtp_entry_t;
 
 // DG entry
@@ -52,6 +63,7 @@ typedef struct {
 
 // RTE OB state
 typedef struct {
+    uint16_t                   rtp_id;
     lan9662_rte_ob_rtp_entry_t rtp_tbl[RTE_OB_RTP_CNT];
     lan9662_rte_ob_dg_entry_t  dg_tbl[RTE_OB_DG_CNT];
 } lan9662_rte_ob_t;
@@ -59,10 +71,13 @@ typedef struct {
 // RTP IB entry
 typedef struct {
     lan9662_rte_ib_rtp_conf_t conf; // Configuration
+    lan9662_rte_counter_t     tx_inj;
+    lan9662_rte_counter_t     tx_otf;
 } lan9662_rte_ib_rtp_entry_t;
 
 // RTE IB state
 typedef struct {
+    uint16_t                   rtp_id;
     uint32_t                   frm_data_addr;
     lan9662_rte_ib_rtp_entry_t rtp_tbl[RTE_IB_RTP_CNT];
 } lan9662_rte_ib_t;
@@ -78,6 +93,13 @@ typedef struct lan9662_rte_inst {
 struct lan9662_rte_inst *lan9662_inst_get(struct lan9662_rte_inst *inst);
 
 int lan9662_rte_rtp_check(uint16_t rtp_id);
+void lan9662_rte_cnt_16_update(uint16_t value, lan9662_rte_counter_t *counter, int clear);
+
+
+int lan9662_ib_init(struct lan9662_rte_inst *inst);
+int lan9662_ob_init(struct lan9662_rte_inst *inst);
+int lan9662_ib_poll(struct lan9662_rte_inst *inst);
+int lan9662_ob_poll(struct lan9662_rte_inst *inst);
 
 /* ================================================================= *
  *  Register access
@@ -235,9 +257,6 @@ int lan9662_ib_debug_print(struct lan9662_rte_inst *inst,
 int lan9662_ob_debug_print(struct lan9662_rte_inst *inst,
                            const lan9662_debug_printf_t pr,
                            const lan9662_debug_info_t   *const info);
-
-int lan9662_ib_init(struct lan9662_rte_inst *inst);
-int lan9662_ob_init(struct lan9662_rte_inst *inst);
 
 #endif // _LAN9662_RTE_PRIVATE_H_
 
