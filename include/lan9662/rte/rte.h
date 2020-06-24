@@ -64,15 +64,8 @@ typedef enum {
 
 // RTP Outbound configuration
 typedef struct {
-    lan9662_rtp_type_t type;
-
-    // Invoke the write_actions directly after frame has been processed, instead
-    // of waiting for time to trigger.
-    uint8_t    write_through;
-
-    // Bit-field of frame checks to enable
-    uint32_t   pdu_checks;
-
+    lan9662_rtp_type_t type;   // RTP entry type
+    uint16_t           length; // Number of bytes after Etype, excluding FCS (zero disables length check)
 } lan9662_rte_ob_rtp_conf_t;
 
 // Get RTP Outbound configuration

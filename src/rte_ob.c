@@ -7,6 +7,13 @@
 int lan9662_ob_init(struct lan9662_rte_inst *inst)
 {
     T_I("enter");
+
+    // Data/transfer status checks
+    REG_WR(RTE_OUTB_PN_PDU_MISC,
+           RTE_OUTB_PN_PDU_MISC_PN_DATA_STATUS_MASK(0) |
+           RTE_OUTB_PN_PDU_MISC_PN_DATA_STATUS_VALID_CHK_ENA(1) |
+           RTE_OUTB_PN_PDU_MISC_PN_TRANSFER_STATUS_CHK_ENA(1));
+
     return 0;
 }
 
@@ -49,15 +56,19 @@ int lan9662_rte_ob_rtp_conf_set(struct lan9662_rte_inst         *inst,
            RTE_OUTB_RTP_MISC_DG_DATA_CP_ENA(0) |
            RTE_OUTB_RTP_MISC_WR_ACTION_ADDR(0));
 
-    // Disable data/transfer status checks
-    REG_WR(RTE_OUTB_PN_PDU_MISC,
-           RTE_OUTB_PN_PDU_MISC_PN_DATA_STATUS_MASK(0) |
-           RTE_OUTB_PN_PDU_MISC_PN_DATA_STATUS_VALID_CHK_ENA(0) |
-           RTE_OUTB_PN_PDU_MISC_PN_TRANSFER_STATUS_CHK_ENA(0));
-
-    // Disable PDU length check
+    // PDU length check
     REG_WR(RTE_OUTB_RTP_PDU_CHKS(rtp_id),
-           RTE_OUTB_RTP_PDU_CHKS_PDU_LEN(0));
+           RTE_OUTB_RTP_PDU_CHKS_PDU_LEN(conf->length) |
+           RTE_OUTB_RTP_PDU_CHKS_PN_CC_INIT(1) |
+           RTE_OUTB_RTP_PDU_CHKS_PN_CC_STORED(0));
+
+    REG_WR(RTE_OUTB_RTP_PN_MISC(rtp_id),
+           RTE_OUTB_RTP_PN_MISC_PN_DATA_STATUS_VAL(0) |
+           RTE_OUTB_RTP_PN_MISC_PN_DATA_STATUS_MISMATCH_VAL(0) |
+           RTE_OUTB_RTP_PN_MISC_PN_CC_CHK_ENA(1) |
+           RTE_OUTB_RTP_PN_MISC_PN_CC_MISMATCH_FRM_FWD_ENA(0) |
+           RTE_OUTB_RTP_PN_MISC_PN_DATA_STATUS_MISMATCH_DROP_ENA(0));
+
     return 0;
 }
 
@@ -289,6 +300,18 @@ int lan9662_ob_debug_print(struct lan9662_rte_inst *inst,
         sprintf(buf, "OUTB_RTP_TBL_%u", i);
         lan9662_debug_print_reg_header(pr, buf);
         lan9662_debug_reg(inst, pr, REG_ADDR(RTE_OUTB_RTP_MISC(i)), "MISC");
+        REG_RD(RTE_OUTB_RTP_PDU_CHKS(i), &value);
+        lan9662_debug_print_reg(pr, "PDU_CHKS", value);
+        lan9662_debug_print_reg(pr, ":PDU_LEN", RTE_OUTB_RTP_PDU_CHKS_PDU_LEN_X(value));
+        lan9662_debug_print_reg(pr, ":PN_CC_INIT", RTE_OUTB_RTP_PDU_CHKS_PN_CC_INIT_X(value));
+        lan9662_debug_print_reg(pr, ":PN_CC_STORED", RTE_OUTB_RTP_PDU_CHKS_PN_CC_STORED_X(value));
+        REG_RD(RTE_OUTB_RTP_PN_MISC(i), &value);
+        lan9662_debug_print_reg(pr, "PN_MISC", value);
+        lan9662_debug_print_reg(pr, ":DATA_STATUS_VAL", RTE_OUTB_RTP_PN_MISC_PN_DATA_STATUS_VAL_X(value));
+        lan9662_debug_print_reg(pr, ":DATA_STATUS_MM", RTE_OUTB_RTP_PN_MISC_PN_DATA_STATUS_MISMATCH_VAL_X(value));
+        lan9662_debug_print_reg(pr, ":CC_CHK_ENA", RTE_OUTB_RTP_PN_MISC_PN_CC_CHK_ENA_X(value));
+        lan9662_debug_print_reg(pr, ":MM_FRM_FWD_ENA", RTE_OUTB_RTP_PN_MISC_PN_CC_MISMATCH_FRM_FWD_ENA_X(value));
+        lan9662_debug_print_reg(pr, ":MM_DROP_ENA", RTE_OUTB_RTP_PN_MISC_PN_DATA_STATUS_MISMATCH_DROP_ENA(value));
         for (j = 0; j < 3; j++) {
             lan9662_debug_reg_inst(inst, pr,
                                    REG_ADDR(RTE_OUTB_DG_ADDR(i, j)), j, "DG_ADDR");
