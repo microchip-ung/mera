@@ -34,6 +34,9 @@ typedef struct {
 #define RTE_OB_DG_CNT  RTE_RTP_CNT
 #define RTE_IB_RTP_CNT RTE_RTP_CNT
 
+// Size of one DG section in 4-byte chunks
+#define RTE_OB_DG_SEC_SIZE 64
+
 // Number of RTPs to poll every second to avoid multiple wrap arounds of 16-bit counters.
 // Minimum cycle time is 200 usec, giving 5000 pps, or 13 seconds to wrap.
 #define RTE_POLL_CNT   (RTE_RTP_CNT / 13)
@@ -257,6 +260,10 @@ int lan9662_ib_debug_print(struct lan9662_rte_inst *inst,
 int lan9662_ob_debug_print(struct lan9662_rte_inst *inst,
                            const lan9662_debug_printf_t pr,
                            const lan9662_debug_info_t   *const info);
+
+#define DBG_REG(addr, name) lan9662_debug_reg(inst, pr, addr, name)
+#define DBG_REG_I(addr, i, name) lan9662_debug_reg_inst(inst, pr, addr, i, name)
+#define DBG_PR_REG(name, value) lan9662_debug_print_reg(pr, name, value)
 
 #endif // _LAN9662_RTE_PRIVATE_H_
 

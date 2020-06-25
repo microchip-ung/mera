@@ -8,6 +8,9 @@ int lan9662_ob_init(struct lan9662_rte_inst *inst)
 {
     T_I("enter");
 
+    REG_WR(RTE_OUTB_RTP_STATE, 0xffffffff);
+    REG_WR(RTE_OUTB_CFG, RTE_OUTB_CFG_OUTB_PORT(4));
+
     // Data/transfer status checks
     REG_WR(RTE_OUTB_PN_PDU_MISC,
            RTE_OUTB_PN_PDU_MISC_PN_DATA_STATUS_MASK(0) |
@@ -53,7 +56,7 @@ int lan9662_rte_ob_rtp_conf_set(struct lan9662_rte_inst         *inst,
            RTE_OUTB_RTP_MISC_PDU_TYPE(type) |
            RTE_OUTB_RTP_MISC_RTP_ENA(ena) |
            RTE_OUTB_RTP_MISC_RTP_GRP_STATE_STOPPED_MODE(1) |
-           RTE_OUTB_RTP_MISC_DG_DATA_CP_ENA(0) |
+           RTE_OUTB_RTP_MISC_DG_DATA_CP_ENA(1) |
            RTE_OUTB_RTP_MISC_WR_ACTION_ADDR(0));
 
     // PDU length check
@@ -247,8 +250,7 @@ int lan9662_ob_debug_print(struct lan9662_rte_inst *inst,
     lan9662_rte_ob_rtp_entry_t *rtp;
     lan9662_rte_ob_dg_entry_t  *dg;
     const char                 *txt;
-    uint32_t                   value;
-    uint16_t                   i, j, addr;
+    uint32_t                   value, base, addr, len, idx, cnt, i, j, k, n;
     char                       buf[32];
 
     lan9662_debug_print_header(pr, "RTE Outbound State");
@@ -287,9 +289,9 @@ int lan9662_ob_debug_print(struct lan9662_rte_inst *inst,
 
     lan9662_debug_print_header(pr, "RTE Outbound Registers");
     lan9662_debug_print_reg_header(pr, "RTE Outbound");
-    lan9662_debug_reg(inst, pr, REG_ADDR(RTE_OUTB_CFG), "OUTB_CFG");
-    lan9662_debug_reg(inst, pr, REG_ADDR(RTE_OUTB_RTP_STATE), "OUTB_RTP_STATE");
-    lan9662_debug_reg(inst, pr, REG_ADDR(RTE_OUTB_STICKY_BITS), "STICKY_BITS");
+    DBG_REG(REG_ADDR(RTE_OUTB_CFG), "OUTB_CFG");
+    DBG_REG(REG_ADDR(RTE_OUTB_RTP_STATE), "OUTB_RTP_STATE");
+    DBG_REG(REG_ADDR(RTE_OUTB_STICKY_BITS), "STICKY_BITS");
     pr("\n");
 
     for (i = 1; i < RTE_OB_RTP_CNT; i++) {
@@ -299,45 +301,105 @@ int lan9662_ob_debug_print(struct lan9662_rte_inst *inst,
         }
         sprintf(buf, "OUTB_RTP_TBL_%u", i);
         lan9662_debug_print_reg_header(pr, buf);
-        lan9662_debug_reg(inst, pr, REG_ADDR(RTE_OUTB_RTP_MISC(i)), "MISC");
+        DBG_REG(REG_ADDR(RTE_OUTB_RTP_MISC(i)), "MISC");
         REG_RD(RTE_OUTB_RTP_PDU_CHKS(i), &value);
-        lan9662_debug_print_reg(pr, "PDU_CHKS", value);
-        lan9662_debug_print_reg(pr, ":PDU_LEN", RTE_OUTB_RTP_PDU_CHKS_PDU_LEN_X(value));
-        lan9662_debug_print_reg(pr, ":PN_CC_INIT", RTE_OUTB_RTP_PDU_CHKS_PN_CC_INIT_X(value));
-        lan9662_debug_print_reg(pr, ":PN_CC_STORED", RTE_OUTB_RTP_PDU_CHKS_PN_CC_STORED_X(value));
+        DBG_PR_REG("PDU_CHKS", value);
+        DBG_PR_REG(":PDU_LEN", RTE_OUTB_RTP_PDU_CHKS_PDU_LEN_X(value));
+        DBG_PR_REG(":PN_CC_INIT", RTE_OUTB_RTP_PDU_CHKS_PN_CC_INIT_X(value));
+        DBG_PR_REG(":PN_CC_STORED", RTE_OUTB_RTP_PDU_CHKS_PN_CC_STORED_X(value));
         REG_RD(RTE_OUTB_RTP_PN_MISC(i), &value);
-        lan9662_debug_print_reg(pr, "PN_MISC", value);
-        lan9662_debug_print_reg(pr, ":DATA_STATUS_VAL", RTE_OUTB_RTP_PN_MISC_PN_DATA_STATUS_VAL_X(value));
-        lan9662_debug_print_reg(pr, ":DATA_STATUS_MM", RTE_OUTB_RTP_PN_MISC_PN_DATA_STATUS_MISMATCH_VAL_X(value));
-        lan9662_debug_print_reg(pr, ":CC_CHK_ENA", RTE_OUTB_RTP_PN_MISC_PN_CC_CHK_ENA_X(value));
-        lan9662_debug_print_reg(pr, ":MM_FRM_FWD_ENA", RTE_OUTB_RTP_PN_MISC_PN_CC_MISMATCH_FRM_FWD_ENA_X(value));
-        lan9662_debug_print_reg(pr, ":MM_DROP_ENA", RTE_OUTB_RTP_PN_MISC_PN_DATA_STATUS_MISMATCH_DROP_ENA(value));
+        DBG_PR_REG("PN_MISC", value);
+        DBG_PR_REG(":DATA_STATUS_VAL", RTE_OUTB_RTP_PN_MISC_PN_DATA_STATUS_VAL_X(value));
+        DBG_PR_REG(":DATA_STATUS_MM", RTE_OUTB_RTP_PN_MISC_PN_DATA_STATUS_MISMATCH_VAL_X(value));
+        DBG_PR_REG(":CC_CHK_ENA", RTE_OUTB_RTP_PN_MISC_PN_CC_CHK_ENA_X(value));
+        DBG_PR_REG(":MM_FRM_FWD_ENA", RTE_OUTB_RTP_PN_MISC_PN_CC_MISMATCH_FRM_FWD_ENA_X(value));
+        DBG_PR_REG(":MM_DROP_ENA", RTE_OUTB_RTP_PN_MISC_PN_DATA_STATUS_MISMATCH_DROP_ENA(value));
         for (j = 0; j < 3; j++) {
-            lan9662_debug_reg_inst(inst, pr,
-                                   REG_ADDR(RTE_OUTB_DG_ADDR(i, j)), j, "DG_ADDR");
+            DBG_REG_I(REG_ADDR(RTE_OUTB_DG_ADDR(i, j)), j, "DG_ADDR");
         }
         REG_RD(RTE_OUTB_PDU_RECV_CNT(i), &value);
-        lan9662_debug_print_reg(pr, "PDU_RECV_CNT", value);
-        lan9662_debug_print_reg(pr, ":CNT0", RTE_OUTB_PDU_RECV_CNT_PDU_RECV_CNT0_X(value));
-        lan9662_debug_print_reg(pr, ":CNT1", RTE_OUTB_PDU_RECV_CNT_PDU_RECV_CNT1_X(value));
-        lan9662_debug_reg(inst, pr, REG_ADDR(RTE_OUTB_RTP_STICKY_BITS(i)), "STICKY_BITS");
+        DBG_PR_REG("PDU_RECV_CNT", value);
+        DBG_PR_REG(":CNT0", RTE_OUTB_PDU_RECV_CNT_PDU_RECV_CNT0_X(value));
+        DBG_PR_REG(":CNT1", RTE_OUTB_PDU_RECV_CNT_PDU_RECV_CNT1_X(value));
+        DBG_REG(REG_ADDR(RTE_OUTB_RTP_STICKY_BITS(i)), "STICKY_BITS");
         pr("\n");
     }
 
     for (i = 1; i < RTE_OB_DG_CNT; i++) {
-        REG_RD(RTE_OUTB_DG_DATA_OFFSET_PDU_POS(i), &value);
-        value = RTE_OUTB_DG_DATA_OFFSET_PDU_POS_DG_DATA_OFFSET_PDU_POS_X(value);
-        if (value == 0 && !info->full) {
+        REG_RD(RTE_OUTB_DG_DATA_SECTION_ADDR(i), &value);
+        base = RTE_OUTB_DG_DATA_SECTION_ADDR_DG_DATA_SECTION_ADDR_X(value);
+        len = RTE_OUTB_DG_DATA_SECTION_ADDR_DG_DATA_LEN_X(value);
+        if (len == 0 && !info->full) {
             continue;
         }
         sprintf(buf, "OUTB_DG_TBL_%u", i);
         lan9662_debug_print_reg_header(pr, buf);
-        lan9662_debug_reg(inst, pr, REG_ADDR(RTE_OUTB_DG_MISC(i)), "MISC");
-        lan9662_debug_reg(inst, pr, REG_ADDR(RTE_OUTB_DG_DATA_OFFSET_PDU_POS(i)),
-                          "PDU_POS");
-        lan9662_debug_reg(inst, pr, REG_ADDR(RTE_OUTB_DG_DATA_SECTION_ADDR(i)),
-                          "DATA_SECTION_ADDR");
+        DBG_REG(REG_ADDR(RTE_OUTB_DG_MISC(i)), "MISC");
+        DBG_REG(REG_ADDR(RTE_OUTB_DG_DATA_OFFSET_PDU_POS(i)), "PDU_POS");
+        DBG_PR_REG("DATA_SECTION_ADDR", value);
+        DBG_PR_REG(":DATA_SECTION_ADDR", base);
+        DBG_PR_REG(":DATA_LEN", len);
+        REG_RD(RTE_OUTB_PN_IOPS(i), &value);
+        DBG_PR_REG("PN_IOPS", value);
+        DBG_PR_REG(":VAL", RTE_OUTB_PN_IOPS_PN_IOPS_VAL_X(value));
+        DBG_PR_REG(":OFFSET_PDU_POS", RTE_OUTB_PN_IOPS_PN_IOPS_OFFSET_PDU_POS_X(value));
+        DBG_PR_REG(":CHK_ENA", RTE_OUTB_PN_IOPS_PN_IOPS_CHK_ENA_X(value));
+        DBG_PR_REG(":MISMATCH_SKIP_ENA", RTE_OUTB_PN_IOPS_PN_IOPS_MISMATCH_SKIP_ENA_X(value));
+        DBG_REG(REG_ADDR(RTE_OUTB_OPC_DATA_SET_FLAGS1_VAL(i)), "OPC_FLAGS1_VAL");
+        REG_RD(RTE_OUTB_OPC_DATA_SET_FLAGS1_MISC(i), &value);
+        DBG_PR_REG("OPC_FLAGS1_MISC", value);
+        DBG_PR_REG(":OFFSET_PDU_POS",
+                   RTE_OUTB_OPC_DATA_SET_FLAGS1_MISC_OPC_DATA_SET_FLAGS1_OFFSET_PDU_POS_X(value));
+        DBG_PR_REG(":MISMATCH_SKIP_ENA",
+                   RTE_OUTB_OPC_DATA_SET_FLAGS1_MISC_OPC_DATA_SET_FLAGS1_MISMATCH_SKIP_ENA_X(value));
+        DBG_PR_REG(":CHK_ENA",
+                   RTE_OUTB_OPC_DATA_SET_FLAGS1_MISC_OPC_DATA_SET_FLAGS1_CHK_ENA_X(value));
+        DBG_REG(REG_ADDR(RTE_OUTB_OPC_SEQ_NUM(i)), "OPC_SEQ_NUM");
+        DBG_REG(REG_ADDR(RTE_OUTB_OPC_STATUS_CODE_VAL(i)), "OPC_STATUS_CODE_VAL");
+        REG_RD(RTE_OUTB_OPC_STATUS_CODE_MISC(i), &value);
+        DBG_PR_REG("OPC_STATUS_CODE_MISC", value);
+        DBG_PR_REG(":CODE_CHK_ENA",
+                   RTE_OUTB_OPC_STATUS_CODE_MISC_OPC_STATUS_CODE_CHK_ENA_X(value));
+        DBG_PR_REG(":MISMATCH_SKIP_ENA",
+                   RTE_OUTB_OPC_STATUS_CODE_MISC_OPC_STATUS_CODE_MISMATCH_SKIP_ENA_X(value));
+        DBG_PR_REG(":FAIL_SEVERITY_VAL",
+                   RTE_OUTB_OPC_STATUS_CODE_MISC_OPC_FAIL_SEVERITY_VAL_X(value));
+        DBG_REG(REG_ADDR(RTE_OUTB_DG_STICKY_BITS(i)), "STICKY_BITS");
+        DBG_REG(REG_ADDR(RTE_OUTB_PN_STATUS(i)), "PN_STATUS");
+        DBG_REG(REG_ADDR(RTE_OUTB_OPC_STATUS(i)), "OPC_STATUS");
+        DBG_REG(REG_ADDR(RTE_OUTB_OPC_STATUS2(i)), "OPC_STATUS2");
         pr("\n");
+
+        // Read latest index
+        REG_WR(RTE_INB_FRM_DATA_CTRL_ACC, RTE_INB_FRM_DATA_CTRL_ACC_FRM_DATA_CTRL_ADDR(i));
+        REG_RD(RTE_OUTB_DG_DATA_RTP_CTRL, &value);
+        idx = RTE_OUTB_DG_DATA_RTP_CTRL_LATEST_IDX_X(value);
+
+        cnt = ((len + 3) / 4);
+        for (j = 0; j < 4; j++) {
+            for (k = 0; k < cnt; k++) {
+                if (k == 0) {
+                    pr("Section %u (%s):\n\n", j,
+                       j == 2 ? "Default" :
+                       j == 3 ? "Last Good" :
+                       j == idx ? "New" : "Old");
+                }
+                addr = (base + k);
+                if (j < 3) {
+                    addr += (j * RTE_OB_DG_SEC_SIZE);
+                    REG_WR(RTE_OUTB_DG_DATA_ADDR, addr);
+                    REG_RD(RTE_OUTB_DG_DATA, &value);
+                } else {
+                    REG_WR(RTE_OUTB_LAST_VLD_DG_DATA_ADDR, addr);
+                    REG_RD(RTE_OUTB_LAST_VLD_DG_DATA, &value);
+                }
+                n = (k % 8);
+                if (n == 0) {
+                    pr("%04x: ", addr);
+                }
+                pr("%08x%s", value, k == (cnt - 1) ? "\n\n" : n == 7 ? "\n" : "-");
+            }
+        }
     }
     return 0;
 }
