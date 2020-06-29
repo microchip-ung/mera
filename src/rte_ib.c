@@ -240,12 +240,20 @@ int lan9662_ib_debug_print(struct lan9662_rte_inst *inst,
         }
         sprintf(buf, "INB_RTP_TBL_%u", i);
         lan9662_debug_print_reg_header(pr, buf);
-        DBG_REG(REG_ADDR(RTE_INB_RTP_MISC(i)), "MISC");
+        REG_RD(RTE_INB_RTP_MISC(i), &value);
+        DBG_PR_REG("MISC", value);
+        DBG_PR_REG_M("RTP_ENA", RTE_INB_RTP_MISC_RTP_ENA, value);
+        DBG_PR_REG_M("CAT", RTE_INB_RTP_MISC_RTP_CAT, value);
+        DBG_PR_REG_M("PDU_TYPE", RTE_INB_RTP_MISC_PDU_TYPE, value);
+        DBG_PR_REG_M("UPD_CNT", RTE_INB_RTP_MISC_LAST_FRM_UPD_CNT, value);
+        DBG_PR_REG_M("OTF_RESTART_ENA", RTE_INB_RTP_MISC_LAST_FRM_UPD_CNT, value);
+        DBG_PR_REG_M("DBG_ENA", RTE_INB_RTP_MISC_RTP_DBG_ENA, value);
+        DBG_PR_REG_M("GRP_ID", RTE_INB_RTP_MISC_RTP_GRP_ID, value);
         REG_RD(RTE_INB_RTP_FRM_PORT(i), &value);
         len = RTE_INB_RTP_FRM_PORT_FRM_LEN_X(value);
         DBG_PR_REG("FRM_PORT", value);
-        DBG_PR_REG(":FRM_LEN", len);
-        DBG_PR_REG(":PORT_NUM", RTE_INB_RTP_FRM_PORT_PORT_NUM_X(value));
+        DBG_PR_REG_M("FRM_LEN", RTE_INB_RTP_FRM_PORT_FRM_LEN, value);
+        DBG_PR_REG_M("PORT_NUM", RTE_INB_RTP_FRM_PORT_PORT_NUM, value);
         REG_RD(RTE_INB_RTP_ADDRS(i), &value);
         base = RTE_INB_RTP_ADDRS_FRM_DATA_ADDR_X(value);
         DBG_PR_REG("ADDRS", value);
@@ -255,8 +263,8 @@ int lan9662_ib_debug_print(struct lan9662_rte_inst *inst,
         DBG_REG(REG_ADDR(RTE_INB_RTP_TIMER_CFG2(i)), "TIMER_CFG2:DELTA");
         REG_RD(RTE_INB_RTP_CNT(i), &value);
         DBG_PR_REG("CNT", value);
-        DBG_PR_REG(":OTF_CNT", RTE_INB_RTP_CNT_FRM_OTF_CNT_X(value));
-        DBG_PR_REG(":INJ_CNT", RTE_INB_RTP_CNT_FRM_INJ_CNT_X(value));
+        DBG_PR_REG_M("OTF_CNT", RTE_INB_RTP_CNT_FRM_OTF_CNT, value);
+        DBG_PR_REG_M("INJ_CNT", RTE_INB_RTP_CNT_FRM_INJ_CNT, value);
         DBG_REG(REG_ADDR(RTE_INB_RTP_STICKY_BITS(i)), "STICKY_BITS");
         pr("\n");
 

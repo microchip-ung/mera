@@ -204,15 +204,32 @@ void lan9662_debug_print_reg_header(const lan9662_debug_printf_t pr, const char 
     pr("%-20s  31    24.23    16.15     8.7      0  Hex         Decimal\n", name);
 }
 
-void lan9662_debug_print_reg(const lan9662_debug_printf_t pr, const char *name, uint32_t value)
+void lan9662_debug_print_reg_mask(const lan9662_debug_printf_t pr, const char *name, uint32_t value, uint32_t mask)
 {
-    uint32_t i;
+    uint32_t i, m, v = value;
 
-    pr("%-20s: ", name);
+    if (mask == 0xffffffff) {
+        pr("%-20s", name);
+    } else {
+        pr(":%-19s", name);
+        for (i = 0; i < 32; i++) {
+            if ((1 << i) & mask) {
+                v = (v << i);
+                break;
+            }
+        }
+    }
+    pr(": ");
     for (i = 0; i < 32; i++) {
-        pr("%s%u", i == 0 || (i % 8) ? "" : ".", value & (1 << (31 - i)) ? 1 : 0);
+        m = (1 << (31 - i));
+        pr("%s%s", i == 0 || (i % 8) ? "" : ".", (mask & m) == 0 ? " " : v & m ? "1" : "0");
     }
     pr("  0x%08x  %u\n", value, value);
+}
+
+void lan9662_debug_print_reg(const lan9662_debug_printf_t pr, const char *name, uint32_t value)
+{
+    lan9662_debug_print_reg_mask(pr, name, value, 0xffffffff);
 }
 
 void lan9662_debug_reg(struct lan9662_rte_inst *inst,
@@ -251,8 +268,8 @@ static int lan9662_gen_debug_print(struct lan9662_rte_inst *inst,
     DBG_REG(REG_ADDR(RTE_SC_LEN), "SC_LEN");
     REG_RD(RTE_SC_TIME, &value);
     DBG_PR_REG("SC_TIME", value);
-    DBG_PR_REG(":SC_RUT_CNT", RTE_SC_TIME_SC_RUT_CNT_X(value));
-    DBG_PR_REG(":SC_IDX", RTE_SC_TIME_SC_IDX_X(value));
+    DBG_PR_REG_M("SC_RUT_CNT", RTE_SC_TIME_SC_RUT_CNT, value);
+    DBG_PR_REG_M("SC_IDX", RTE_SC_TIME_SC_IDX, value);
     value = (RTE_SC_TIME_SC_IDX_X(value) * (RTE_SC_TIME_SC_RUT_CNT_M + 1) + RTE_SC_TIME_SC_RUT_CNT_X(value));
     DBG_PR_REG(":SC_IDX:SC_RUT_CNT", value);
     pr("\n");

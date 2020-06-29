@@ -64,8 +64,10 @@ typedef enum {
 
 // RTP Outbound configuration
 typedef struct {
-    lan9662_rtp_type_t type;   // RTP entry type
-    uint16_t           length; // Number of bytes after Etype, excluding FCS (zero disables length check)
+    lan9662_rtp_type_t type;        // RTP entry type
+    uint16_t           length;      // Number of bytes after Etype, excluding FCS (zero disables length check)
+    uint8_t            pn_ds;       // Profinet DataStatus, matched using mask 0x37
+    uint32_t           opc_grp_ver; // OPC GroupVersion
 } lan9662_rte_ob_rtp_conf_t;
 
 // Get RTP Outbound configuration

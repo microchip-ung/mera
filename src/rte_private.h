@@ -249,6 +249,7 @@ void lan9662_debug_print_header(const lan9662_debug_printf_t pr,
                                 const char                   *header);
 void lan9662_debug_print_reg_header(const lan9662_debug_printf_t pr, const char *name);
 void lan9662_debug_print_reg(const lan9662_debug_printf_t pr, const char *name, uint32_t value);
+void lan9662_debug_print_reg_mask(const lan9662_debug_printf_t pr, const char *name, uint32_t value, uint32_t mask);
 void lan9662_debug_reg(struct lan9662_rte_inst *inst,
                        const lan9662_debug_printf_t pr, uint32_t addr, const char *name);
 void lan9662_debug_reg_inst(struct lan9662_rte_inst *inst,
@@ -264,6 +265,7 @@ int lan9662_ob_debug_print(struct lan9662_rte_inst *inst,
 #define DBG_REG(addr, name) lan9662_debug_reg(inst, pr, addr, name)
 #define DBG_REG_I(addr, i, name) lan9662_debug_reg_inst(inst, pr, addr, i, name)
 #define DBG_PR_REG(name, value) lan9662_debug_print_reg(pr, name, value)
+#define DBG_PR_REG_M(name, fld, value) lan9662_debug_print_reg_mask(pr, name, fld##_X(value), fld##_M);
 
 #endif // _LAN9662_RTE_PRIVATE_H_
 

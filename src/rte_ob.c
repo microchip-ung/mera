@@ -4,8 +4,14 @@
 #define LAN9662_TRACE_GROUP LAN9662_TRACE_GROUP_OB
 #include "rte_private.h"
 
+// Profinet DataStatus value/mask
+#define RTE_OB_PN_DS_MASK 0x37
+#define RTE_OB_PN_DS_VAL  0x37
+
 int lan9662_ob_init(struct lan9662_rte_inst *inst)
 {
+    uint32_t i;
+
     T_I("enter");
 
     REG_WR(RTE_OUTB_RTP_STATE, 0xffffffff);
@@ -13,9 +19,27 @@ int lan9662_ob_init(struct lan9662_rte_inst *inst)
 
     // Data/transfer status checks
     REG_WR(RTE_OUTB_PN_PDU_MISC,
-           RTE_OUTB_PN_PDU_MISC_PN_DATA_STATUS_MASK(0) |
-           RTE_OUTB_PN_PDU_MISC_PN_DATA_STATUS_VALID_CHK_ENA(1) |
+           RTE_OUTB_PN_PDU_MISC_PN_DATA_STATUS_MASK(0x37) |
+           RTE_OUTB_PN_PDU_MISC_PN_DATA_STATUS_VALID_CHK_ENA(0) |
            RTE_OUTB_PN_PDU_MISC_PN_TRANSFER_STATUS_CHK_ENA(1));
+
+    // OPC PDU checks
+    REG_WR(RTE_OUTB_OPC_PDU_FLAGS,
+           RTE_OUTB_OPC_PDU_FLAGS_OPC_EXT_FLAGS1_VAL(0x01) |
+           RTE_OUTB_OPC_PDU_FLAGS_OPC_EXT_FLAGS1_MASK(0xff) |
+           RTE_OUTB_OPC_PDU_FLAGS_OPC_GRP_FLAGS_VAL(0x0f) |
+           RTE_OUTB_OPC_PDU_FLAGS_OPC_GRP_FLAGS_MASK(0xff));
+    REG_WR(RTE_OUTB_OPC_PDU_MISC,
+           RTE_OUTB_OPC_PDU_MISC_OPC_FLAGS_VAL(0xb) |
+           RTE_OUTB_OPC_PDU_MISC_OPC_FLAGS_MASK(0xf) |
+           RTE_OUTB_OPC_PDU_MISC_OPC_VER(1) |
+           RTE_OUTB_OPC_PDU_MISC_OPC_GRP_VER_CHK_ENA(1) |
+           RTE_OUTB_OPC_PDU_MISC_OPC_NETWORK_MSG_NUM(1));
+
+    // Profinet DataStatus default
+    for (i = 1; i < RTE_OB_RTP_CNT; i++) {
+        inst->ob.rtp_tbl[i].conf.pn_ds = RTE_OB_PN_DS_VAL;
+    }
 
     return 0;
 }
@@ -66,12 +90,13 @@ int lan9662_rte_ob_rtp_conf_set(struct lan9662_rte_inst         *inst,
            RTE_OUTB_RTP_PDU_CHKS_PN_CC_STORED(0));
 
     REG_WR(RTE_OUTB_RTP_PN_MISC(rtp_id),
-           RTE_OUTB_RTP_PN_MISC_PN_DATA_STATUS_VAL(0) |
+           RTE_OUTB_RTP_PN_MISC_PN_DATA_STATUS_VAL(conf->pn_ds) |
            RTE_OUTB_RTP_PN_MISC_PN_DATA_STATUS_MISMATCH_VAL(0) |
            RTE_OUTB_RTP_PN_MISC_PN_CC_CHK_ENA(1) |
            RTE_OUTB_RTP_PN_MISC_PN_CC_MISMATCH_FRM_FWD_ENA(0) |
-           RTE_OUTB_RTP_PN_MISC_PN_DATA_STATUS_MISMATCH_DROP_ENA(0));
+           RTE_OUTB_RTP_PN_MISC_PN_DATA_STATUS_MISMATCH_DROP_ENA(1));
 
+    REG_WR(RTE_OUTB_RTP_OPC_GRP_VER(rtp_id), conf->opc_grp_ver);
     return 0;
 }
 
@@ -291,6 +316,24 @@ int lan9662_ob_debug_print(struct lan9662_rte_inst *inst,
     lan9662_debug_print_reg_header(pr, "RTE Outbound");
     DBG_REG(REG_ADDR(RTE_OUTB_CFG), "OUTB_CFG");
     DBG_REG(REG_ADDR(RTE_OUTB_RTP_STATE), "OUTB_RTP_STATE");
+    REG_RD(RTE_OUTB_PN_PDU_MISC, &value);
+    DBG_PR_REG("PN_PDU_MISC", value);
+    DBG_PR_REG_M("STATUS_MASK", RTE_OUTB_PN_PDU_MISC_PN_DATA_STATUS_MASK, value);
+    DBG_PR_REG_M("VALID_CHK_ENA", RTE_OUTB_PN_PDU_MISC_PN_DATA_STATUS_VALID_CHK_ENA, value);
+    DBG_PR_REG_M("TRANSFER_CHK_ENA", RTE_OUTB_PN_PDU_MISC_PN_TRANSFER_STATUS_CHK_ENA, value);
+    REG_RD(RTE_OUTB_OPC_PDU_FLAGS, &value);
+    DBG_PR_REG("OPC_PDU_FLAGS", value);
+    DBG_PR_REG_M("EXT_FLAGS1_VAL", RTE_OUTB_OPC_PDU_FLAGS_OPC_EXT_FLAGS1_VAL, value);
+    DBG_PR_REG_M("EXT_FLAGS1_MASK", RTE_OUTB_OPC_PDU_FLAGS_OPC_EXT_FLAGS1_MASK, value);
+    DBG_PR_REG_M("GRP_FLAGS_VAL", RTE_OUTB_OPC_PDU_FLAGS_OPC_GRP_FLAGS_VAL, value);
+    DBG_PR_REG_M("GRP_FLAGS_MASK", RTE_OUTB_OPC_PDU_FLAGS_OPC_GRP_FLAGS_MASK, value);
+    REG_RD(RTE_OUTB_OPC_PDU_MISC, &value);
+    DBG_PR_REG("OPC_PDU_MISC", value);
+    DBG_PR_REG_M("FLAGS_VAL", RTE_OUTB_OPC_PDU_MISC_OPC_FLAGS_VAL, value);
+    DBG_PR_REG_M("FLAGS_MASK", RTE_OUTB_OPC_PDU_MISC_OPC_FLAGS_MASK, value);
+    DBG_PR_REG_M("VER", RTE_OUTB_OPC_PDU_MISC_OPC_VER, value);
+    DBG_PR_REG_M("GRP_VER_CHK_ENA", RTE_OUTB_OPC_PDU_MISC_OPC_GRP_VER_CHK_ENA, value);
+    DBG_PR_REG_M("NMSG_NUM", RTE_OUTB_OPC_PDU_MISC_OPC_NETWORK_MSG_NUM, value);
     DBG_REG(REG_ADDR(RTE_OUTB_STICKY_BITS), "STICKY_BITS");
     pr("\n");
 
@@ -301,27 +344,36 @@ int lan9662_ob_debug_print(struct lan9662_rte_inst *inst,
         }
         sprintf(buf, "OUTB_RTP_TBL_%u", i);
         lan9662_debug_print_reg_header(pr, buf);
-        DBG_REG(REG_ADDR(RTE_OUTB_RTP_MISC(i)), "MISC");
+        REG_RD(RTE_OUTB_RTP_MISC(i), &value);
+        DBG_PR_REG("MISC", value);
+        DBG_PR_REG_M("GRP_ID", RTE_OUTB_RTP_MISC_RTP_GRP_ID, value);
+        DBG_PR_REG_M("PDU_TYPE", RTE_OUTB_RTP_MISC_PDU_TYPE, value);
+        DBG_PR_REG_M("RTP_ENA", RTE_OUTB_RTP_MISC_RTP_ENA, value);
+        DBG_PR_REG_M("STOPPED_MODE", RTE_OUTB_RTP_MISC_RTP_GRP_STATE_STOPPED_MODE, value);
+        DBG_PR_REG_M("DATA_CP_ENA", RTE_OUTB_RTP_MISC_DG_DATA_CP_ENA, value);
+        DBG_PR_REG_M("WR_ACTION_ADDR", RTE_OUTB_RTP_MISC_WR_ACTION_ADDR, value);
+        DBG_PR_REG_M("DBG_ENA", RTE_OUTB_RTP_MISC_RTP_DBG_ENA, value);
         REG_RD(RTE_OUTB_RTP_PDU_CHKS(i), &value);
         DBG_PR_REG("PDU_CHKS", value);
-        DBG_PR_REG(":PDU_LEN", RTE_OUTB_RTP_PDU_CHKS_PDU_LEN_X(value));
-        DBG_PR_REG(":PN_CC_INIT", RTE_OUTB_RTP_PDU_CHKS_PN_CC_INIT_X(value));
-        DBG_PR_REG(":PN_CC_STORED", RTE_OUTB_RTP_PDU_CHKS_PN_CC_STORED_X(value));
+        DBG_PR_REG_M("PDU_LEN", RTE_OUTB_RTP_PDU_CHKS_PDU_LEN, value);
+        DBG_PR_REG_M("PN_CC_INIT", RTE_OUTB_RTP_PDU_CHKS_PN_CC_INIT, value);
+        DBG_PR_REG_M("PN_CC_STORED", RTE_OUTB_RTP_PDU_CHKS_PN_CC_STORED, value);
         REG_RD(RTE_OUTB_RTP_PN_MISC(i), &value);
         DBG_PR_REG("PN_MISC", value);
-        DBG_PR_REG(":DATA_STATUS_VAL", RTE_OUTB_RTP_PN_MISC_PN_DATA_STATUS_VAL_X(value));
-        DBG_PR_REG(":DATA_STATUS_MM", RTE_OUTB_RTP_PN_MISC_PN_DATA_STATUS_MISMATCH_VAL_X(value));
-        DBG_PR_REG(":CC_CHK_ENA", RTE_OUTB_RTP_PN_MISC_PN_CC_CHK_ENA_X(value));
-        DBG_PR_REG(":MM_FRM_FWD_ENA", RTE_OUTB_RTP_PN_MISC_PN_CC_MISMATCH_FRM_FWD_ENA_X(value));
-        DBG_PR_REG(":MM_DROP_ENA", RTE_OUTB_RTP_PN_MISC_PN_DATA_STATUS_MISMATCH_DROP_ENA(value));
+        DBG_PR_REG_M("DATA_STATUS_VAL", RTE_OUTB_RTP_PN_MISC_PN_DATA_STATUS_VAL, value);
+        DBG_PR_REG_M("DATA_STATUS_MM", RTE_OUTB_RTP_PN_MISC_PN_DATA_STATUS_MISMATCH_VAL, value);
+        DBG_PR_REG_M("CC_CHK_ENA", RTE_OUTB_RTP_PN_MISC_PN_CC_CHK_ENA, value);
+        DBG_PR_REG_M("MM_FRM_FWD_ENA", RTE_OUTB_RTP_PN_MISC_PN_CC_MISMATCH_FRM_FWD_ENA, value);
+        DBG_PR_REG_M("MM_DROP_ENA", RTE_OUTB_RTP_PN_MISC_PN_DATA_STATUS_MISMATCH_DROP_ENA, value);
+        DBG_REG(REG_ADDR(RTE_OUTB_RTP_OPC_GRP_VER(i)), "OPC_GRP_VER");
+        REG_RD(RTE_OUTB_PDU_RECV_CNT(i), &value);
+        DBG_PR_REG("PDU_RECV_CNT", value);
+        DBG_PR_REG_M("CNT0", RTE_OUTB_PDU_RECV_CNT_PDU_RECV_CNT0, value);
+        DBG_PR_REG_M("CNT1", RTE_OUTB_PDU_RECV_CNT_PDU_RECV_CNT1, value);
+        DBG_REG(REG_ADDR(RTE_OUTB_RTP_STICKY_BITS(i)), "STICKY_BITS");
         for (j = 0; j < 3; j++) {
             DBG_REG_I(REG_ADDR(RTE_OUTB_DG_ADDR(i, j)), j, "DG_ADDR");
         }
-        REG_RD(RTE_OUTB_PDU_RECV_CNT(i), &value);
-        DBG_PR_REG("PDU_RECV_CNT", value);
-        DBG_PR_REG(":CNT0", RTE_OUTB_PDU_RECV_CNT_PDU_RECV_CNT0_X(value));
-        DBG_PR_REG(":CNT1", RTE_OUTB_PDU_RECV_CNT_PDU_RECV_CNT1_X(value));
-        DBG_REG(REG_ADDR(RTE_OUTB_RTP_STICKY_BITS(i)), "STICKY_BITS");
         pr("\n");
     }
 
@@ -332,13 +384,15 @@ int lan9662_ob_debug_print(struct lan9662_rte_inst *inst,
         if (len == 0 && !info->full) {
             continue;
         }
-        sprintf(buf, "OUTB_DG_TBL_%u", i);
+
+        j = ob->dg_tbl[i].rtp_id;
+        sprintf(buf, "OUTB_DG_TBL_%u_%u", i, j);
         lan9662_debug_print_reg_header(pr, buf);
         DBG_REG(REG_ADDR(RTE_OUTB_DG_MISC(i)), "MISC");
         DBG_REG(REG_ADDR(RTE_OUTB_DG_DATA_OFFSET_PDU_POS(i)), "PDU_POS");
         DBG_PR_REG("DATA_SECTION_ADDR", value);
-        DBG_PR_REG(":DATA_SECTION_ADDR", base);
-        DBG_PR_REG(":DATA_LEN", len);
+        DBG_PR_REG_M("DATA_SECTION_ADDR", RTE_OUTB_DG_DATA_SECTION_ADDR_DG_DATA_SECTION_ADDR, value);
+        DBG_PR_REG_M("DATA_LEN", RTE_OUTB_DG_DATA_SECTION_ADDR_DG_DATA_LEN, value);
         REG_RD(RTE_OUTB_PN_IOPS(i), &value);
         DBG_PR_REG("PN_IOPS", value);
         DBG_PR_REG(":VAL", RTE_OUTB_PN_IOPS_PN_IOPS_VAL_X(value));
@@ -370,8 +424,8 @@ int lan9662_ob_debug_print(struct lan9662_rte_inst *inst,
         DBG_REG(REG_ADDR(RTE_OUTB_OPC_STATUS2(i)), "OPC_STATUS2");
         pr("\n");
 
-        // Read latest index
-        REG_WR(RTE_INB_FRM_DATA_CTRL_ACC, RTE_INB_FRM_DATA_CTRL_ACC_FRM_DATA_CTRL_ADDR(i));
+        // Read latest index for RTP
+        REG_WR(RTE_OUTB_DG_DATA_RTP_CTRL_ACC, RTE_OUTB_DG_DATA_RTP_CTRL_ACC_DG_DATA_RTP_CTRL_ADDR(j));
         REG_RD(RTE_OUTB_DG_DATA_RTP_CTRL, &value);
         idx = RTE_OUTB_DG_DATA_RTP_CTRL_LATEST_IDX_X(value);
 
