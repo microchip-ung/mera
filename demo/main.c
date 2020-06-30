@@ -20,7 +20,7 @@ enum {
 static mscc_appl_trace_group_t trace_groups[TRACE_GROUP_CNT] = {
     {
         .name = "default",
-        .level = LAN9662_TRACE_LEVEL_ERROR
+        .level = MERA_TRACE_LEVEL_ERROR
     },
 };
 
@@ -194,13 +194,13 @@ int fd_read_register(int fd, fd_read_callback_t cb, void *ref)
 
 int main(int argc, char **argv)
 {
-    mscc_appl_init_t        init;
-    struct lan9662_rte_inst *inst;
-    lan9662_rte_cb_t        cb = {};
-    struct timeval          tv;
-    int                     i, fd, fd_max, poll_cnt = 0;
-    fd_set                  rfds;
-    fd_read_reg_t           *reg;
+    mscc_appl_init_t init;
+    struct mera_inst *inst;
+    mera_cb_t        cb = {};
+    struct timeval   tv;
+    int              i, fd, fd_max, poll_cnt = 0;
+    fd_set           rfds;
+    fd_read_reg_t    *reg;
 
     // Register trace
     init.cmd = MSCC_INIT_CMD_REG;
@@ -221,7 +221,7 @@ int main(int argc, char **argv)
     cb.reg_rd = uio_reg_read;
     cb.reg_wr = uio_reg_write;
 
-    if ((inst = lan9662_rte_create(&cb)) == NULL) {
+    if ((inst = mera_create(&cb)) == NULL) {
         T_E("rte_create() failed");
         return 1;
     }
@@ -262,7 +262,7 @@ int main(int argc, char **argv)
             poll_cnt = 0;
             init.cmd = MSCC_INIT_CMD_POLL;
             init_modules(&init);
-            lan9662_rte_poll(NULL);
+            mera_poll(NULL);
         }
     }
     return 0;

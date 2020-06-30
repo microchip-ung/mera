@@ -43,8 +43,8 @@ $options[:input_files] = ARGV
 $do_trace = false
 FileUtils.mkdir_p($options[:output_dir])
 $log = File.open("#{$options[:output_dir]}/log-rpc.txt", "w")
-$c_hdr = File.open("#{$options[:output_dir]}/lan9662-rte-rpc.h", "w")
-$c_src = File.open("#{$options[:output_dir]}/lan9662-rte-rpc.c", "w")
+$c_hdr = File.open("#{$options[:output_dir]}/mera-rpc.h", "w")
+$c_src = File.open("#{$options[:output_dir]}/mera-rpc.c", "w")
 
 def trace s = ""
     puts s
@@ -64,8 +64,8 @@ $types = {
     "i16"          => {:type_fam=>:type_alias, :type_name=>"i16",          :type_next=>"int16_t",      :type_resolved=>{:type=>"int16_t",      :abi=>:abi_stable}},
     "i32"          => {:type_fam=>:type_alias, :type_name=>"i32",          :type_next=>"int32_t",      :type_resolved=>{:type=>"int32_t",      :abi=>:abi_stable}},
     "i64"          => {:type_fam=>:type_alias, :type_name=>"i64",          :type_next=>"int64_t",      :type_resolved=>{:type=>"int64_t",      :abi=>:abi_stable}},
-    "lan9662_rte_inst"  => {:type_fam=>:type_alias, :type_name=>"lan9662_rte_inst",  :type_next=>"lan9662_rte_inst",  :type_resolved=>{:type=>"lan9662_rte_inst",  :abi=>:abi_stable}},
-    "lan9662_bool_t"  => {:type_fam=>:type_alias, :type_name=>"lan9662_bool_t",  :type_next=>"lan9662_bool_t",  :type_resolved=>{:type=>"lan9662_bool_t",  :abi=>:abi_stable}},
+    "mera_inst"  => {:type_fam=>:type_alias, :type_name=>"mera_inst",  :type_next=>"mera_inst",  :type_resolved=>{:type=>"mera_inst",  :abi=>:abi_stable}},
+    "mera_bool_t"  => {:type_fam=>:type_alias, :type_name=>"mera_bool_t",  :type_next=>"mera_bool_t",  :type_resolved=>{:type=>"mera_bool_t",  :abi=>:abi_stable}},
 
     # terminal types
     "void"         => {:type_fam=>:type_alias, :type_name=>"void",         :type_next=>"void",         :type_resolved=>{:type=>"void",         :abi=>:abi_stable}},
@@ -92,16 +92,16 @@ $methods = {}
 $methods_impl_no_auto = []
 
 $methods_blacklist = [
-    "lan9662_rte_create",
-    "lan9662_rte_destroy",
-    "lan9662_trace_conf_get",
-    "lan9662_trace_conf_set",
-    "lan9662_callout_trace_hex_dump",
-    "lan9662_callout_trace_printf",
-    "lan9662_debug_info_get",
-    "lan9662_debug_info_print",
-    "lan9662_rte_ob_dg_data_get",
-    "lan9662_rte_ob_dg_data_bulk_get",
+    "mera_create",
+    "mera_destroy",
+    "mera_trace_conf_get",
+    "mera_trace_conf_set",
+    "mera_callout_trace_hex_dump",
+    "mera_callout_trace_printf",
+    "mera_debug_info_get",
+    "mera_debug_info_print",
+    "mera_ob_dg_data_get",
+    "mera_ob_dg_data_bulk_get",
 ]
 
 $methods_greylist = [
@@ -539,7 +539,7 @@ def handle_typedef ast
     return if ["i8", "i16", "i32", "i64",
                "u8", "u16", "u32", "u64",
                "BOOL", "uintptr_t",
-               "vtss_inst_t", "lan9662_rte_inst"].include? t
+               "vtss_inst_t", "mera_inst"].include? t
 
     return if not type_check_black_list t
 
@@ -598,7 +598,7 @@ def analyze_return_type t
     #pp base_type
     #pp $types[base_type]
 
-    if base_type == "lan9662_bool_t"
+    if base_type == "mera_bool_t"
         #puts "type-DB: #{__LINE__}"
         #pp $types
     end
@@ -926,7 +926,7 @@ $methods.each do |m, o|
     #begin
         aa = analyze_args o[:args]
         aa.each do |a|
-            next if a[:type_base] == "struct lan9662_rte_inst"
+            next if a[:type_base] == "struct mera_inst"
             $tl << a[:type_resolved][:type_resolved][:type]
         end
     #rescue => err
@@ -985,7 +985,7 @@ end
 $c_hdr.puts "#include <json_rpc.h>"
 $c_hdr.puts ""
 
-$c_src.puts "#include <lan9662-rte-rpc.h>"
+$c_src.puts "#include <mera-rpc.h>"
 $c_src.puts "#pragma GCC diagnostic ignored \"-Wmaybe-uninitialized\""
 $c_src.puts ""
 
@@ -1066,7 +1066,7 @@ end
 
 def add_member_get_func m
     n = m[:member_name]
-    t = (m[:member_type] == "lan9662_bool_t" ? "lan9662_bool_t" : m[:type_resolved][:type])
+    t = (m[:member_type] == "mera_bool_t" ? "mera_bool_t" : m[:type_resolved][:type])
     str_parm = "&(parm->#{n})"
     n = "\"#{n}\""
 
@@ -1115,7 +1115,7 @@ end
 
 def add_member_add_func m
     n = m[:member_name]
-    t = (m[:member_type] == "lan9662_bool_t" ? "lan9662_bool_t" : m[:type_resolved][:type])
+    t = (m[:member_type] == "mera_bool_t" ? "mera_bool_t" : m[:type_resolved][:type])
     str_parm = "&(parm->#{n})"
     n = "\"#{n}\""
     type_array = member_array(m)
@@ -1241,7 +1241,7 @@ $methods.each do |m, o|
 
         str1 = ""
         aa.each do |a|
-            next if a[:type_base] == "struct lan9662_rte_inst"
+            next if a[:type_base] == "struct mera_inst"
             str = a[:type_base]
             str1 = "[#{a[:array][0]}]" if (a[:array].size > 0)
             $c_src.puts "    #{str} #{a[:arg_name]}#{str1};"
@@ -1250,7 +1250,7 @@ $methods.each do |m, o|
         $c_src.puts ""
         prev_arg = ""
         aa.each do |a|
-            next if a[:type_base] == "struct lan9662_rte_inst"
+            next if a[:type_base] == "struct mera_inst"
             next if a[:direction] == :DIR_OUT
             if (a[:array].size > 0)
                 end_str = a[:array][0]
@@ -1264,7 +1264,7 @@ $methods.each do |m, o|
             #$c_src.puts a.pretty_inspect
             #$c_src.puts "#endif"
 
-            t = (a[:type_base] == "lan9662_bool_t" ? "lan9662_bool_t" : type_resolve(a[:type_base])[:type])
+            t = (a[:type_base] == "mera_bool_t" ? "mera_bool_t" : type_resolve(a[:type_base])[:type])
             if (end_str.length > 0)
                 $c_src.puts "    {"
                 $c_src.puts "        json_object *obj;"
@@ -1290,7 +1290,7 @@ $methods.each do |m, o|
             is_array = false
             aa.each do |a|
                 $c_src.print ", " if a != aa.first
-                if a[:type_base] == "struct lan9662_rte_inst"
+                if a[:type_base] == "struct mera_inst"
                     $c_src.print "NULL"
                 else
                     $c_src.print "&" if a[:ptr] and !is_array
@@ -1306,12 +1306,12 @@ $methods.each do |m, o|
         prev_arg = ""
 
         aa.each do |a|
-            next if a[:type_base] == "struct lan9662_rte_inst"
+            next if a[:type_base] == "struct mera_inst"
 
             #$c_src.puts "#if 0"
             #$c_src.puts a.pretty_inspect
             #$c_src.puts "#endif"
-            t = (a[:type_base] == "lan9662_bool_t" ? "lan9662_bool_t" : type_resolve(a[:type_base])[:type])
+            t = (a[:type_base] == "mera_bool_t" ? "mera_bool_t" : type_resolve(a[:type_base])[:type])
 
             if a[:direction] == :DIR_IN
                 $c_src.puts "    json_object_array_add(req->result, NULL);  /* #{a[:arg_name]} #{__LINE__} */"

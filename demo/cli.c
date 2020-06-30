@@ -29,7 +29,7 @@ enum {
 static mscc_appl_trace_group_t trace_groups[TRACE_GROUP_CNT] = {
     {
         .name = "default",
-        .level = LAN9662_TRACE_LEVEL_ERROR
+        .level = MERA_TRACE_LEVEL_ERROR
     },
 };
 

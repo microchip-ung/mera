@@ -8,7 +8,7 @@
 #include <sys/socket.h>
 #include <errno.h>
 #include <netinet/in.h>
-#include <lan9662-rte-rpc.h>
+#include <mera-rpc.h>
 #include "main.h"
 #include "trace.h"
 #include "cli.h"
@@ -26,7 +26,7 @@ static mscc_appl_trace_group_t trace_groups[TRACE_GROUP_CNT] = {
     // TRACE_GROUP_DEFAULT
     {
         .name = "default",
-        .level = LAN9662_TRACE_LEVEL_ERROR
+        .level = MERA_TRACE_LEVEL_ERROR
     },
 };
 
@@ -570,7 +570,7 @@ int json_rpc_add_name_int64_t(json_rpc_req_t *req, json_object *obj, const char 
 /* - Boolean ------------------------------------------------------- */
 
 // Get from array
-int json_rpc_get_idx_lan9662_bool_t(json_rpc_req_t *req, json_object *obj, int *idx, lan9662_bool_t *value)
+int json_rpc_get_idx_mera_bool_t(json_rpc_req_t *req, json_object *obj, int *idx, mera_bool_t *value)
 {
     json_object *obj_value;
 
@@ -580,7 +580,7 @@ int json_rpc_get_idx_lan9662_bool_t(json_rpc_req_t *req, json_object *obj, int *
 }
 
 // Get from object
-int json_rpc_get_name_lan9662_bool_t(json_rpc_req_t *req, json_object *obj, const char *name, lan9662_bool_t *value)
+int json_rpc_get_name_mera_bool_t(json_rpc_req_t *req, json_object *obj, const char *name, mera_bool_t *value)
 {
     json_object *obj_value;
 
@@ -590,13 +590,13 @@ int json_rpc_get_name_lan9662_bool_t(json_rpc_req_t *req, json_object *obj, cons
 }
 
 // Add to array
-int json_rpc_add_lan9662_bool_t(json_rpc_req_t *req, json_object *obj, lan9662_bool_t *value)
+int json_rpc_add_mera_bool_t(json_rpc_req_t *req, json_object *obj, mera_bool_t *value)
 {
     return json_rpc_add_json_array(req, obj, json_object_new_boolean(*value));
 }
 
 // Add to object
-int json_rpc_add_name_lan9662_bool_t(json_rpc_req_t *req, json_object *obj, const char *name, lan9662_bool_t *value)
+int json_rpc_add_name_mera_bool_t(json_rpc_req_t *req, json_object *obj, const char *name, mera_bool_t *value)
 {
     return json_rpc_add_name_json_object(req, obj, name, json_object_new_boolean(*value));
 }

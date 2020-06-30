@@ -44,12 +44,12 @@ void mscc_appl_json_rpc_init(mscc_appl_init_t *init);
 void mscc_appl_uio_init(mscc_appl_init_t *init);
 
 int uio_init(void);
-int uio_reg_read(struct lan9662_rte_inst *inst,
-                 const uintptr_t         addr,
-                 uint32_t                *data);
-int uio_reg_write(struct lan9662_rte_inst *inst,
-                  const uintptr_t         addr,
-                  const uint32_t          data);
+int uio_reg_read(struct mera_inst *inst,
+                 const uintptr_t  addr,
+                 uint32_t         *data);
+int uio_reg_write(struct mera_inst *inst,
+                  const uintptr_t  addr,
+                  const uint32_t   data);
     
 // File descriptor read activity callback registration
 typedef void (*fd_read_callback_t)(int fd, void *ref);

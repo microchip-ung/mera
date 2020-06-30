@@ -1,9 +1,9 @@
 # Copyright (c) 2004-2020 Microchip Technology Inc. and its subsidiaries.
 # SPDX-License-Identifier: MIT
 
-project(lan9662rte)
+project(mera)
 
-option(BUILD_LAN9662_RTE_DEMO "Build LAN9662 RTE demo" ON)
+option(BUILD_MERA_DEMO "Build MERA demo" ON)
 
 cmake_minimum_required(VERSION 2.8.12)
 
@@ -12,9 +12,9 @@ include(.cmake/common.cmake)
 
 include_directories(include)
 
-add_library(lan9662-rte SHARED src/rte.c src/rte_ib.c src/rte_ob.c)
+add_library(mera SHARED src/rte.c src/rte_ib.c src/rte_ob.c)
 
-if (${BUILD_LAN9662_RTE_DEMO})
+if (${BUILD_MERA_DEMO})
     find_library(JSON_LIB json-c)
     mark_as_advanced(JSON_LIB)
     if (JSON_LIB)

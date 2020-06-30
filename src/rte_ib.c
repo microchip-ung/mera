@@ -1,46 +1,46 @@
 // Copyright (c) 2020 Microchip Technology Inc. and its subsidiaries.
 // SPDX-License-Identifier: MIT
 
-#define LAN9662_TRACE_GROUP LAN9662_TRACE_GROUP_IB
+#define MERA_TRACE_GROUP MERA_TRACE_GROUP_IB
 #include "rte_private.h"
 
-int lan9662_ib_init(struct lan9662_rte_inst *inst)
+int mera_ib_init(struct mera_inst *inst)
 {
     T_I("enter");
     return 0;
 }
 
-int lan9662_rte_ib_rtp_conf_get(struct lan9662_rte_inst   *inst,
-                                const uint16_t            rtp_id,
-                                lan9662_rte_ib_rtp_conf_t *const conf)
+int mera_ib_rtp_conf_get(struct mera_inst   *inst,
+                         const uint16_t     rtp_id,
+                         mera_ib_rtp_conf_t *const conf)
 {
     T_I("enter");
-    inst = lan9662_inst_get(inst);
-    LAN9662_RC(lan9662_rte_rtp_check(rtp_id));
+    inst = mera_inst_get(inst);
+    MERA_RC(mera_rtp_check(rtp_id));
     *conf = inst->ib.rtp_tbl[rtp_id].conf;
     return 0;
 }
 
 #define IFH_LEN 28
 
-int lan9662_rte_ib_rtp_conf_set(struct lan9662_rte_inst         *inst,
-                                const uint16_t                  rtp_id,
-                                const lan9662_rte_ib_rtp_conf_t *const conf)
+int mera_ib_rtp_conf_set(struct mera_inst         *inst,
+                         const uint16_t           rtp_id,
+                         const mera_ib_rtp_conf_t *const conf)
 {
-    lan9662_rte_ib_t *ib;
-    uint32_t         type = (conf->type == LAN9662_RTP_TYPE_OPC_UA ? 1 : 0);
-    uint32_t         ena = (conf->type == LAN9662_RTP_TYPE_DISABLED ? 0 : 1);
-    uint32_t         len = (conf->length < 60 ? 60 : conf->length);
-    uint32_t         inj = (conf->mode == LAN9662_RTP_IB_MODE_INJ ? 1 : 0);
-    uint32_t         i, j, k, m, addr, value, len_old, cnt, chg;
+    mera_ib_t *ib;
+    uint32_t  type = (conf->type == MERA_RTP_TYPE_OPC_UA ? 1 : 0);
+    uint32_t  ena = (conf->type == MERA_RTP_TYPE_DISABLED ? 0 : 1);
+    uint32_t  len = (conf->length < 60 ? 60 : conf->length);
+    uint32_t  inj = (conf->mode == MERA_RTP_IB_MODE_INJ ? 1 : 0);
+    uint32_t  i, j, k, m, addr, value, len_old, cnt, chg;
 
     T_I("enter");
-    inst = lan9662_inst_get(inst);
+    inst = mera_inst_get(inst);
     ib = &inst->ib;
-    LAN9662_RC(lan9662_rte_rtp_check(rtp_id));
+    MERA_RC(mera_rtp_check(rtp_id));
 
     // Check frame length
-    if (len > LAN9662_FRAME_DATA_CNT) {
+    if (len > MERA_FRAME_DATA_CNT) {
         T_E("illegal length: %u", len);
         return -1;
     }
@@ -83,7 +83,7 @@ int lan9662_rte_ib_rtp_conf_set(struct lan9662_rte_inst         *inst,
     value = (conf->time ? 0 : RTE_SC_TIME_SC_RUT_CNT_X(value));
     REG_WR(RTE_INB_RTP_TIMER_CFG1(rtp_id), RTE_INB_RTP_TIMER_CFG1_FIRST_RUT_CNT(value));
     REG_WR(RTE_INB_RTP_TIMER_CFG2(rtp_id),
-           RTE_INB_RTP_TIMER_CFG2_DELTA_RUT_CNT(LAN9662_RUT_TIME(conf->time)));
+           RTE_INB_RTP_TIMER_CFG2_DELTA_RUT_CNT(MERA_RUT_TIME(conf->time)));
     REG_WR(RTE_INB_TIMER_CMD,
            RTE_INB_TIMER_CMD_TIMER_CMD(ena && inj ? 2 : 1) |
            RTE_INB_TIMER_CMD_TIMER_RSLT(0) |
@@ -119,19 +119,19 @@ int lan9662_rte_ib_rtp_conf_set(struct lan9662_rte_inst         *inst,
     return 0;
 }
 
-static int lan9662_rte_ib_rtp_counters_update(struct lan9662_rte_inst       *inst,
-                                              const uint16_t                rtp_id,
-                                              lan9662_rte_ib_rtp_counters_t *const counters,
-                                              int                           clear)
+static int mera_ib_rtp_counters_update(struct mera_inst       *inst,
+                                       const uint16_t         rtp_id,
+                                       mera_ib_rtp_counters_t *const counters,
+                                       int                    clear)
 {
-    lan9662_rte_ib_rtp_entry_t *rtp;
-    uint32_t                   value;
+    mera_ib_rtp_entry_t *rtp;
+    uint32_t            value;
 
     rtp = &inst->ib.rtp_tbl[rtp_id];
-    if (rtp->conf.type != LAN9662_RTP_TYPE_DISABLED) {
+    if (rtp->conf.type != MERA_RTP_TYPE_DISABLED) {
         REG_RD(RTE_INB_RTP_CNT(rtp_id), &value);
-        lan9662_rte_cnt_16_update(RTE_INB_RTP_CNT_FRM_OTF_CNT_X(value), &rtp->tx_otf, clear);
-        lan9662_rte_cnt_16_update(RTE_INB_RTP_CNT_FRM_INJ_CNT_X(value), &rtp->tx_inj, clear);
+        mera_cnt_16_update(RTE_INB_RTP_CNT_FRM_OTF_CNT_X(value), &rtp->tx_otf, clear);
+        mera_cnt_16_update(RTE_INB_RTP_CNT_FRM_INJ_CNT_X(value), &rtp->tx_inj, clear);
     }
     if (counters != NULL) {
         counters->tx_otf = rtp->tx_otf.value;
@@ -140,29 +140,29 @@ static int lan9662_rte_ib_rtp_counters_update(struct lan9662_rte_inst       *ins
     return 0;
 }
 
-int lan9662_rte_ib_rtp_counters_get(struct lan9662_rte_inst       *inst,
-                                    const uint16_t                rtp_id,
-                                    lan9662_rte_ib_rtp_counters_t *const counters)
+int mera_ib_rtp_counters_get(struct mera_inst       *inst,
+                             const uint16_t         rtp_id,
+                             mera_ib_rtp_counters_t *const counters)
 {
     T_I("enter");
-    inst = lan9662_inst_get(inst);
-    LAN9662_RC(lan9662_rte_rtp_check(rtp_id));
-    return lan9662_rte_ib_rtp_counters_update(inst, rtp_id, counters, 0);
+    inst = mera_inst_get(inst);
+    MERA_RC(mera_rtp_check(rtp_id));
+    return mera_ib_rtp_counters_update(inst, rtp_id, counters, 0);
 }
 
-int lan9662_rte_ib_rtp_counters_clr(struct lan9662_rte_inst *inst,
-                                    const uint16_t          rtp_id)
+int mera_ib_rtp_counters_clr(struct mera_inst *inst,
+                             const uint16_t   rtp_id)
 {
     T_I("enter");
-    inst = lan9662_inst_get(inst);
-    LAN9662_RC(lan9662_rte_rtp_check(rtp_id));
-    return lan9662_rte_ib_rtp_counters_update(inst, rtp_id, NULL, 1);
+    inst = mera_inst_get(inst);
+    MERA_RC(mera_rtp_check(rtp_id));
+    return mera_ib_rtp_counters_update(inst, rtp_id, NULL, 1);
 }
 
-int lan9662_ib_poll(struct lan9662_rte_inst *inst)
+int mera_ib_poll(struct mera_inst *inst)
 {
-    lan9662_rte_ib_t *ib = &inst->ib;
-    uint32_t         i;
+    mera_ib_t *ib = &inst->ib;
+    uint32_t  i;
 
     T_I("enter");
     for (i = 0; i < RTE_POLL_CNT; i++) {
@@ -170,22 +170,22 @@ int lan9662_ib_poll(struct lan9662_rte_inst *inst)
         if (ib->rtp_id >= RTE_IB_RTP_CNT) {
             ib->rtp_id = 1;
         }
-        LAN9662_RC(lan9662_rte_ib_rtp_counters_update(inst, ib->rtp_id, NULL, 0));
+        MERA_RC(mera_ib_rtp_counters_update(inst, ib->rtp_id, NULL, 0));
     }
     return 0;
 }
 
-int lan9662_ib_debug_print(struct lan9662_rte_inst *inst,
-                           const lan9662_debug_printf_t pr,
-                           const lan9662_debug_info_t   *const info)
+int mera_ib_debug_print(struct mera_inst *inst,
+                           const mera_debug_printf_t pr,
+                           const mera_debug_info_t   *const info)
 {
-    lan9662_rte_ib_t           *ib = &inst->ib;
-    lan9662_rte_ib_rtp_entry_t *rtp;
-    const char                 *txt;
-    uint32_t                   i, j, k, m, value, chg, base, addr, len;
-    char                       buf[32];
+    mera_ib_t           *ib = &inst->ib;
+    mera_ib_rtp_entry_t *rtp;
+    const char          *txt;
+    uint32_t            i, j, k, m, value, chg, base, addr, len;
+    char                buf[32];
 
-    lan9662_debug_print_header(pr, "RTE Inbound State");
+    mera_debug_print_header(pr, "RTE Inbound State");
     pr("Next RTP ID    : %u\n", ib->rtp_id);
     addr = ib->frm_data_addr;
     pr("Frame Data Addr: %u (%u bytes used)\n\n", addr, addr * 32);
@@ -193,10 +193,10 @@ int lan9662_ib_debug_print(struct lan9662_rte_inst *inst,
     for (i = 1; i < RTE_OB_RTP_CNT; i++) {
         rtp = &ib->rtp_tbl[i];
         switch (rtp->conf.type) {
-        case LAN9662_RTP_TYPE_PN:
+        case MERA_RTP_TYPE_PN:
             txt = "Profinet";
             break;
-        case LAN9662_RTP_TYPE_OPC_UA:
+        case MERA_RTP_TYPE_OPC_UA:
             txt = "OPC-UA";
             break;
         default:
@@ -208,7 +208,7 @@ int lan9662_ib_debug_print(struct lan9662_rte_inst *inst,
         }
         pr("RTP ID: %u\n", i);
         pr("Type  : %s\n", txt);
-        pr("Mode  : %s\n", rtp->conf.mode == LAN9662_RTP_IB_MODE_INJ ? "INJ" : "OTF");
+        pr("Mode  : %s\n", rtp->conf.mode == MERA_RTP_IB_MODE_INJ ? "INJ" : "OTF");
         pr("Time  : %u.%03u usec\n", rtp->conf.time / 1000, rtp->conf.time % 1000);
         len = rtp->conf.length;
         pr("Length: %u\n", len);
@@ -227,8 +227,8 @@ int lan9662_ib_debug_print(struct lan9662_rte_inst *inst,
         }
     }
 
-    lan9662_debug_print_header(pr, "RTE Inbound Registers");
-    lan9662_debug_print_reg_header(pr, "RTE Inbound");
+    mera_debug_print_header(pr, "RTE Inbound Registers");
+    mera_debug_print_reg_header(pr, "RTE Inbound");
     DBG_REG(REG_ADDR(RTE_INB_CFG), "RTE_INB_CFG");
     DBG_REG(REG_ADDR(RTE_INB_STICKY_BITS), "RTE_INB_STICKY_BITS");
     pr("\n");
@@ -239,7 +239,7 @@ int lan9662_ib_debug_print(struct lan9662_rte_inst *inst,
             continue;
         }
         sprintf(buf, "INB_RTP_TBL_%u", i);
-        lan9662_debug_print_reg_header(pr, buf);
+        mera_debug_print_reg_header(pr, buf);
         REG_RD(RTE_INB_RTP_MISC(i), &value);
         DBG_PR_REG("MISC", value);
         DBG_PR_REG_M("RTP_ENA", RTE_INB_RTP_MISC_RTP_ENA, value);

@@ -1,14 +1,14 @@
 // Copyright (c) 2020 Microchip Technology Inc. and its subsidiaries.
 // SPDX-License-Identifier: MIT
 
-#define LAN9662_TRACE_GROUP LAN9662_TRACE_GROUP_OB
+#define MERA_TRACE_GROUP MERA_TRACE_GROUP_OB
 #include "rte_private.h"
 
 // Profinet DataStatus value/mask
 #define RTE_OB_PN_DS_MASK 0xb7
 #define RTE_OB_PN_DS_VAL  0x35
 
-int lan9662_ob_init(struct lan9662_rte_inst *inst)
+int mera_ob_init(struct mera_inst *inst)
 {
     uint32_t i;
 
@@ -44,36 +44,36 @@ int lan9662_ob_init(struct lan9662_rte_inst *inst)
     return 0;
 }
 
-int lan9662_rte_rtp_check(uint16_t rtp_id)
+int mera_rtp_check(uint16_t rtp_id)
 {
-    if (rtp_id == 0 || rtp_id > LAN9662_RTE_RTP_CNT) {
+    if (rtp_id == 0 || rtp_id > MERA_RTP_CNT) {
         T_E("illegal rtp_id: %u", rtp_id);
         return -1;
     }
     return 0;
 }
 
-int lan9662_rte_ob_rtp_conf_get(struct lan9662_rte_inst   *inst,
-                                const uint16_t            rtp_id,
-                                lan9662_rte_ob_rtp_conf_t *const conf)
+int mera_ob_rtp_conf_get(struct mera_inst   *inst,
+                         const uint16_t     rtp_id,
+                         mera_ob_rtp_conf_t *const conf)
 {
     T_I("enter");
-    inst = lan9662_inst_get(inst);
-    LAN9662_RC(lan9662_rte_rtp_check(rtp_id));
+    inst = mera_inst_get(inst);
+    MERA_RC(mera_rtp_check(rtp_id));
     *conf = inst->ob.rtp_tbl[rtp_id].conf;
     return 0;
 }
 
-int lan9662_rte_ob_rtp_conf_set(struct lan9662_rte_inst         *inst,
-                                const uint16_t                  rtp_id,
-                                const lan9662_rte_ob_rtp_conf_t *const conf)
+int mera_ob_rtp_conf_set(struct mera_inst         *inst,
+                         const uint16_t           rtp_id,
+                         const mera_ob_rtp_conf_t *const conf)
 {
-    uint32_t type = (conf->type == LAN9662_RTP_TYPE_OPC_UA ? 1 : 0);
-    uint32_t ena = (conf->type == LAN9662_RTP_TYPE_DISABLED ? 0 : 1);
+    uint32_t type = (conf->type == MERA_RTP_TYPE_OPC_UA ? 1 : 0);
+    uint32_t ena = (conf->type == MERA_RTP_TYPE_DISABLED ? 0 : 1);
 
     T_I("enter");
-    inst = lan9662_inst_get(inst);
-    LAN9662_RC(lan9662_rte_rtp_check(rtp_id));
+    inst = mera_inst_get(inst);
+    MERA_RC(mera_rtp_check(rtp_id));
     inst->ob.rtp_tbl[rtp_id].conf = *conf;
     REG_WR(RTE_OUTB_RTP_MISC(rtp_id),
            RTE_OUTB_RTP_MISC_RTP_GRP_ID(0) |
@@ -100,24 +100,24 @@ int lan9662_rte_ob_rtp_conf_set(struct lan9662_rte_inst         *inst,
     return 0;
 }
 
-int lan9662_rte_ob_rtp_pdu2dg_init(lan9662_rte_ob_rtp_pdu2dg_conf_t *const conf)
+int mera_ob_rtp_pdu2dg_init(mera_ob_rtp_pdu2dg_conf_t *const conf)
 {
     memset(conf, 0, sizeof(*conf));
     return 0;
 }
 
-int lan9662_rte_ob_rtp_pdu2dg_add(struct lan9662_rte_inst                *inst,
-                                  const uint16_t                         rtp_id,
-                                  const lan9662_rte_ob_rtp_pdu2dg_conf_t *conf)
+int mera_ob_rtp_pdu2dg_add(struct mera_inst                *inst,
+                           const uint16_t                  rtp_id,
+                           const mera_ob_rtp_pdu2dg_conf_t *conf)
 {
-    lan9662_rte_ob_t           *ob;
-    lan9662_rte_ob_dg_entry_t  *dg, *prev;
-    lan9662_rte_ob_rtp_entry_t *rtp;
-    uint16_t                   i, addr, new = 0, prev_addr;
+    mera_ob_t           *ob;
+    mera_ob_dg_entry_t  *dg, *prev;
+    mera_ob_rtp_entry_t *rtp;
+    uint16_t            i, addr, new = 0, prev_addr;
 
     T_I("enter");
-    inst = lan9662_inst_get(inst);
-    LAN9662_RC(lan9662_rte_rtp_check(rtp_id));
+    inst = mera_inst_get(inst);
+    MERA_RC(mera_rtp_check(rtp_id));
 
     // Find free DG entry
     ob = &inst->ob;
@@ -184,17 +184,17 @@ int lan9662_rte_ob_rtp_pdu2dg_add(struct lan9662_rte_inst                *inst,
     return 0;
 }
 
-int lan9662_rte_ob_rtp_pdu2dg_clr(struct lan9662_rte_inst *inst,
-                                  const uint16_t          rtp_id)
+int mera_ob_rtp_pdu2dg_clr(struct mera_inst *inst,
+                           const uint16_t   rtp_id)
 {
-    lan9662_rte_ob_t           *ob;
-    lan9662_rte_ob_dg_entry_t  *dg;
-    lan9662_rte_ob_rtp_entry_t *rtp;
-    uint16_t                   i, addr, prev_addr;
+    mera_ob_t           *ob;
+    mera_ob_dg_entry_t  *dg;
+    mera_ob_rtp_entry_t *rtp;
+    uint16_t            i, addr, prev_addr;
 
     T_I("enter");
-    inst = lan9662_inst_get(inst);
-    LAN9662_RC(lan9662_rte_rtp_check(rtp_id));
+    inst = mera_inst_get(inst);
+    MERA_RC(mera_rtp_check(rtp_id));
 
     // Clear list in state and hardware
     ob = &inst->ob;
@@ -214,22 +214,22 @@ int lan9662_rte_ob_rtp_pdu2dg_clr(struct lan9662_rte_inst *inst,
     return 0;
 }
 
-static int lan9662_rte_ob_rtp_counters_update(struct lan9662_rte_inst       *inst,
-                                              const uint16_t                rtp_id,
-                                              lan9662_rte_ob_rtp_counters_t *const counters,
-                                              int                           clear)
+static int mera_ob_rtp_counters_update(struct mera_inst       *inst,
+                                       const uint16_t         rtp_id,
+                                       mera_ob_rtp_counters_t *const counters,
+                                       int                    clear)
 {
-    lan9662_rte_ob_rtp_entry_t *rtp;
-    uint32_t                   value;
+    mera_ob_rtp_entry_t *rtp;
+    uint32_t            value;
 
     T_I("enter");
-    inst = lan9662_inst_get(inst);
-    LAN9662_RC(lan9662_rte_rtp_check(rtp_id));
+    inst = mera_inst_get(inst);
+    MERA_RC(mera_rtp_check(rtp_id));
     rtp = &inst->ob.rtp_tbl[rtp_id];
-    if (rtp->conf.type != LAN9662_RTP_TYPE_DISABLED) {
+    if (rtp->conf.type != MERA_RTP_TYPE_DISABLED) {
         REG_RD(RTE_OUTB_PDU_RECV_CNT(rtp_id), &value);
-        lan9662_rte_cnt_16_update(RTE_OUTB_PDU_RECV_CNT_PDU_RECV_CNT0_X(value), &rtp->rx_0, clear);
-        lan9662_rte_cnt_16_update(RTE_OUTB_PDU_RECV_CNT_PDU_RECV_CNT1_X(value), &rtp->rx_1, clear);
+        mera_cnt_16_update(RTE_OUTB_PDU_RECV_CNT_PDU_RECV_CNT0_X(value), &rtp->rx_0, clear);
+        mera_cnt_16_update(RTE_OUTB_PDU_RECV_CNT_PDU_RECV_CNT1_X(value), &rtp->rx_1, clear);
         if (counters != NULL) {
             counters->rx_0 = rtp->rx_0.value;
             counters->rx_1 = rtp->rx_1.value;
@@ -238,23 +238,23 @@ static int lan9662_rte_ob_rtp_counters_update(struct lan9662_rte_inst       *ins
     return 0;
 }
 
-int lan9662_rte_ob_rtp_counters_get(struct lan9662_rte_inst       *inst,
-                                    const uint16_t                rtp_id,
-                                    lan9662_rte_ob_rtp_counters_t *const counters)
+int mera_ob_rtp_counters_get(struct mera_inst       *inst,
+                             const uint16_t         rtp_id,
+                             mera_ob_rtp_counters_t *const counters)
 {
-    return lan9662_rte_ob_rtp_counters_update(inst, rtp_id, counters, 0);
+    return mera_ob_rtp_counters_update(inst, rtp_id, counters, 0);
 }
 
-int lan9662_rte_ob_rtp_counters_clr(struct lan9662_rte_inst *inst,
-                                    const uint16_t          rtp_id)
+int mera_ob_rtp_counters_clr(struct mera_inst *inst,
+                             const uint16_t   rtp_id)
 {
-    return lan9662_rte_ob_rtp_counters_update(inst, rtp_id, NULL, 1);
+    return mera_ob_rtp_counters_update(inst, rtp_id, NULL, 1);
 }
 
-int lan9662_ob_poll(struct lan9662_rte_inst *inst)
+int mera_ob_poll(struct mera_inst *inst)
 {
-    lan9662_rte_ob_t *ob = &inst->ob;
-    uint32_t         i;
+    mera_ob_t *ob = &inst->ob;
+    uint32_t  i;
 
     T_I("enter");
     for (i = 0; i < RTE_POLL_CNT; i++) {
@@ -262,33 +262,66 @@ int lan9662_ob_poll(struct lan9662_rte_inst *inst)
         if (ob->rtp_id >= RTE_IB_RTP_CNT) {
             ob->rtp_id = 1;
         }
-        LAN9662_RC(lan9662_rte_ob_rtp_counters_update(inst, ob->rtp_id, NULL, 0));
+        MERA_RC(mera_ob_rtp_counters_update(inst, ob->rtp_id, NULL, 0));
     }
     return 0;
 }
 
-int lan9662_ob_debug_print(struct lan9662_rte_inst *inst,
-                           const lan9662_debug_printf_t pr,
-                           const lan9662_debug_info_t   *const info)
+static int mera_ob_debug_dg_data(struct mera_inst *inst,
+                                 const mera_debug_printf_t pr,
+                                 uint32_t addr,
+                                 uint32_t sec)
 {
-    lan9662_rte_ob_t           *ob = &inst->ob;
-    lan9662_rte_ob_rtp_entry_t *rtp;
-    lan9662_rte_ob_dg_entry_t  *dg;
-    const char                 *txt;
-    uint32_t                   value, base, addr, len, idx, cnt, i, j, k, n;
-    char                       buf[32];
+    uint32_t i, n, value, base, cnt;
 
-    lan9662_debug_print_header(pr, "RTE Outbound State");
+    REG_RD(RTE_OUTB_DG_DATA_SECTION_ADDR(addr), &value);
+    base = RTE_OUTB_DG_DATA_SECTION_ADDR_DG_DATA_SECTION_ADDR_X(value);
+    cnt = ((RTE_OUTB_DG_DATA_SECTION_ADDR_DG_DATA_LEN_X(value) + 3) / 4);
+    for (i = 0; i < cnt; i++) {
+        addr = (base + i);
+        if (sec < 3) {
+            addr += (sec * RTE_OB_DG_SEC_SIZE);
+            REG_WR(RTE_OUTB_DG_DATA_ADDR, addr);
+            REG_RD(RTE_OUTB_DG_DATA, &value);
+        } else {
+            REG_WR(RTE_OUTB_LAST_VLD_DG_DATA_ADDR, addr);
+            REG_RD(RTE_OUTB_LAST_VLD_DG_DATA, &value);
+        }
+        n = (i % 8);
+        if (n == 0) {
+            pr("%04x: ", addr);
+        }
+        pr("%08x%s", value, i == (cnt - 1) ? "\n\n" : n == 7 ? "\n" : "-");
+    }
+    return 0;
+}
+
+int mera_ob_debug_print(struct mera_inst *inst,
+                        const mera_debug_printf_t pr,
+                        const mera_debug_info_t   *const info)
+{
+    mera_ob_t           *ob = &inst->ob;
+    mera_ob_rtp_entry_t *rtp;
+    mera_ob_dg_entry_t  *dg;
+    const char          *txt;
+    uint32_t            value, addr, len, pos, idx, i, j;
+    char                buf[32];
+    struct {
+        uint32_t cnt;
+        uint32_t addr[3];
+    } addr_table;
+
+    mera_debug_print_header(pr, "RTE Outbound State");
     pr("Next RTP ID: %u\n\n", ob->rtp_id);
 
     for (i = 1; i < RTE_OB_RTP_CNT; i++) {
         rtp = &ob->rtp_tbl[i];
         addr = rtp->addr;
         switch (rtp->conf.type) {
-        case LAN9662_RTP_TYPE_PN:
+        case MERA_RTP_TYPE_PN:
             txt = "Profinet";
             break;
-        case LAN9662_RTP_TYPE_OPC_UA:
+        case MERA_RTP_TYPE_OPC_UA:
             txt = "OPC-UA";
             break;
         default:
@@ -312,8 +345,8 @@ int lan9662_ob_debug_print(struct lan9662_rte_inst *inst,
         pr("\n");
     }
 
-    lan9662_debug_print_header(pr, "RTE Outbound Registers");
-    lan9662_debug_print_reg_header(pr, "RTE Outbound");
+    mera_debug_print_header(pr, "RTE Outbound Registers");
+    mera_debug_print_reg_header(pr, "RTE Outbound");
     DBG_REG(REG_ADDR(RTE_OUTB_CFG), "OUTB_CFG");
     DBG_REG(REG_ADDR(RTE_OUTB_RTP_STATE), "OUTB_RTP_STATE");
     REG_RD(RTE_OUTB_PN_PDU_MISC, &value);
@@ -343,7 +376,7 @@ int lan9662_ob_debug_print(struct lan9662_rte_inst *inst,
             continue;
         }
         sprintf(buf, "OUTB_RTP_TBL_%u", i);
-        lan9662_debug_print_reg_header(pr, buf);
+        mera_debug_print_reg_header(pr, buf);
         REG_RD(RTE_OUTB_RTP_MISC(i), &value);
         DBG_PR_REG("MISC", value);
         DBG_PR_REG_M("GRP_ID", RTE_OUTB_RTP_MISC_RTP_GRP_ID, value);
@@ -371,15 +404,38 @@ int lan9662_ob_debug_print(struct lan9662_rte_inst *inst,
         DBG_PR_REG_M("CNT0", RTE_OUTB_PDU_RECV_CNT_PDU_RECV_CNT0, value);
         DBG_PR_REG_M("CNT1", RTE_OUTB_PDU_RECV_CNT_PDU_RECV_CNT1, value);
         DBG_REG(REG_ADDR(RTE_OUTB_RTP_STICKY_BITS(i)), "STICKY_BITS");
+
+        // Show DG data
+        memset(&addr_table, 0, sizeof(addr_table));
         for (j = 0; j < 3; j++) {
             DBG_REG_I(REG_ADDR(RTE_OUTB_DG_ADDR(i, j)), j, "DG_ADDR");
+            REG_RD(RTE_OUTB_DG_ADDR(i, j), &value);
+            if ((addr = RTE_OUTB_DG_ADDR_DG_ADDR_X(value)) != 0) {
+                addr_table.addr[addr_table.cnt++] = addr;
+            }
         }
         pr("\n");
+        while (addr_table.cnt != 0) {
+            addr = addr_table.addr[0];
+            addr_table.addr[0] = addr_table.addr[1];
+            addr_table.addr[1] = addr_table.addr[2];
+            addr_table.cnt--;
+            REG_RD(RTE_OUTB_DG_DATA_OFFSET_PDU_POS(addr), &value);
+            pos = RTE_OUTB_DG_DATA_OFFSET_PDU_POS_DG_DATA_OFFSET_PDU_POS_X(value);
+            REG_WR(RTE_OUTB_DG_DATA_RTP_CTRL_ACC, RTE_OUTB_DG_DATA_RTP_CTRL_ACC_DG_DATA_RTP_CTRL_ADDR(i));
+            REG_RD(RTE_OUTB_DG_DATA_RTP_CTRL, &value);
+            idx = RTE_OUTB_DG_DATA_RTP_CTRL_LATEST_IDX_X(value);
+            pr("Addr %u, PDU Offset %u, Section %u:\n", addr, pos, idx);
+            MERA_RC(mera_ob_debug_dg_data(inst, pr, addr, idx));
+            REG_RD(RTE_OUTB_DG_MISC(addr), &value);
+            if ((addr = RTE_OUTB_DG_MISC_DG_ADDR_X(value)) != 0) {
+                addr_table.addr[addr_table.cnt++] = addr;
+            }
+        }
     }
 
     for (i = 1; i < RTE_OB_DG_CNT; i++) {
         REG_RD(RTE_OUTB_DG_DATA_SECTION_ADDR(i), &value);
-        base = RTE_OUTB_DG_DATA_SECTION_ADDR_DG_DATA_SECTION_ADDR_X(value);
         len = RTE_OUTB_DG_DATA_SECTION_ADDR_DG_DATA_LEN_X(value);
         if (len == 0 && !info->full) {
             continue;
@@ -387,8 +443,12 @@ int lan9662_ob_debug_print(struct lan9662_rte_inst *inst,
 
         j = ob->dg_tbl[i].rtp_id;
         sprintf(buf, "OUTB_DG_TBL_%u_%u", i, j);
-        lan9662_debug_print_reg_header(pr, buf);
-        DBG_REG(REG_ADDR(RTE_OUTB_DG_MISC(i)), "MISC");
+        mera_debug_print_reg_header(pr, buf);
+        REG_RD(RTE_OUTB_DG_MISC(i), &value);
+        DBG_PR_REG("MISC", value);
+        DBG_PR_REG_M("BASE_PDU_POS", RTE_OUTB_DG_MISC_DG_BASE_PDU_POS, value);
+        DBG_PR_REG_M("DG_ADDR", RTE_OUTB_DG_MISC_DG_ADDR, value);
+        DBG_PR_REG_M("DBG_ENA", RTE_OUTB_DG_MISC_DG_DBG_ENA, value);
         DBG_REG(REG_ADDR(RTE_OUTB_DG_DATA_OFFSET_PDU_POS(i)), "PDU_POS");
         DBG_PR_REG("DATA_SECTION_ADDR", value);
         DBG_PR_REG_M("DATA_SECTION_ADDR", RTE_OUTB_DG_DATA_SECTION_ADDR_DG_DATA_SECTION_ADDR, value);
@@ -428,31 +488,11 @@ int lan9662_ob_debug_print(struct lan9662_rte_inst *inst,
         REG_WR(RTE_OUTB_DG_DATA_RTP_CTRL_ACC, RTE_OUTB_DG_DATA_RTP_CTRL_ACC_DG_DATA_RTP_CTRL_ADDR(j));
         REG_RD(RTE_OUTB_DG_DATA_RTP_CTRL, &value);
         idx = RTE_OUTB_DG_DATA_RTP_CTRL_LATEST_IDX_X(value);
-
-        cnt = ((len + 3) / 4);
         for (j = 0; j < 4; j++) {
-            for (k = 0; k < cnt; k++) {
-                if (k == 0) {
-                    pr("Section %u (%s):\n\n", j,
-                       j == 2 ? "Default" :
-                       j == 3 ? "Last Good" :
-                       j == idx ? "New" : "Old");
-                }
-                addr = (base + k);
-                if (j < 3) {
-                    addr += (j * RTE_OB_DG_SEC_SIZE);
-                    REG_WR(RTE_OUTB_DG_DATA_ADDR, addr);
-                    REG_RD(RTE_OUTB_DG_DATA, &value);
-                } else {
-                    REG_WR(RTE_OUTB_LAST_VLD_DG_DATA_ADDR, addr);
-                    REG_RD(RTE_OUTB_LAST_VLD_DG_DATA, &value);
-                }
-                n = (k % 8);
-                if (n == 0) {
-                    pr("%04x: ", addr);
-                }
-                pr("%08x%s", value, k == (cnt - 1) ? "\n\n" : n == 7 ? "\n" : "-");
-            }
+            pr("Section %u (%s):\n",
+               j,
+               j == 2 ? "Default" : j == 3 ? "Last Good" :  j == idx ? "New" : "Old");
+            MERA_RC(mera_ob_debug_dg_data(inst, pr, i, j));
         }
     }
     return 0;

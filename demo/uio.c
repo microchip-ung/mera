@@ -31,7 +31,7 @@ static mscc_appl_trace_group_t trace_groups[TRACE_GROUP_CNT] = {
     // TRACE_GROUP_DEFAULT
     {
         .name = "default",
-        .level = LAN9662_TRACE_LEVEL_ERROR
+        .level = MERA_TRACE_LEVEL_ERROR
     },
 };
 
@@ -45,17 +45,17 @@ static mscc_appl_trace_group_t trace_groups[TRACE_GROUP_CNT] = {
 static volatile uint32_t *base_mem;
 
 /* MEBA callouts */
-int uio_reg_read(struct lan9662_rte_inst *inst,
-                 const uintptr_t         addr,
-                 uint32_t                *data)
+int uio_reg_read(struct mera_inst *inst,
+                 const uintptr_t  addr,
+                 uint32_t         *data)
 {
     *data = PCIE_HOST_CVT(base_mem[addr]);
     return 0;
 }
 
-int uio_reg_write(struct lan9662_rte_inst *inst,
-                  const uintptr_t         addr,
-                  const uint32_t          data)
+int uio_reg_write(struct mera_inst *inst,
+                  const uintptr_t  addr,
+                  const uint32_t   data)
 {
     base_mem[addr] = PCIE_HOST_CVT(data);
     return 0;

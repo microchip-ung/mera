@@ -195,7 +195,7 @@ class CParser < Parslet::Parser
 
     rule(:mesa_attr) {
         (spaces? >> str("MESA_ATTR_PRINTF") >> left_paren >> digits >> comma >> digits >> right_paren) |
-        (spaces? >> str("LAN9662_ATTR_PRINTF") >> left_paren >> digits >> comma >> digits >> right_paren) |
+        (spaces? >> str("MERA_ATTR_PRINTF") >> left_paren >> digits >> comma >> digits >> right_paren) |
         (spaces? >> str("VTSS_ATTR_PRINTF") >> left_paren >> digits >> comma >> digits >> right_paren) |
         (spaces? >> str("VTSS_OS_COMPILER_ATTRIBUTE_ALIGNED") >> left_paren >> identifier >> right_paren)
     }

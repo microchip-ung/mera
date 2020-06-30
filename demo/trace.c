@@ -19,26 +19,26 @@ static mscc_appl_trace_module_t trace_module = {
     .name = "rte"
 };
 
-#define TRACE_GROUP_CNT LAN9662_TRACE_GROUP_CNT
+#define TRACE_GROUP_CNT MERA_TRACE_GROUP_CNT
 
 static mscc_appl_trace_group_t trace_groups[TRACE_GROUP_CNT] = {
     {
         .name = "default",
-        .level = LAN9662_TRACE_LEVEL_ERROR
+        .level = MERA_TRACE_LEVEL_ERROR
     },
     {
         .name = "ib",
-        .level = LAN9662_TRACE_LEVEL_ERROR
+        .level = MERA_TRACE_LEVEL_ERROR
     },
     {
         .name = "ob",
-        .level = LAN9662_TRACE_LEVEL_ERROR
+        .level = MERA_TRACE_LEVEL_ERROR
     },
 };
 
 static void printf_trace_head(const char *mname,
                               const char *gname,
-                              const lan9662_trace_level_t level,
+                              const mera_trace_level_t level,
                               const char *file,
                               const int line,
                               const char *function,
@@ -62,19 +62,19 @@ static void printf_trace_head(const char *mname,
            h, m, s, tv.tv_usec,
            mname,
            gname,
-           level == LAN9662_TRACE_LEVEL_ERROR ? "error" :
-           level == LAN9662_TRACE_LEVEL_INFO ? "info" :
-           level == LAN9662_TRACE_LEVEL_DEBUG ? "debug" :
-           level == LAN9662_TRACE_LEVEL_NOISE ? "noise" : "?",
+           level == MERA_TRACE_LEVEL_ERROR ? "error" :
+           level == MERA_TRACE_LEVEL_INFO ? "info" :
+           level == MERA_TRACE_LEVEL_DEBUG ? "debug" :
+           level == MERA_TRACE_LEVEL_NOISE ? "noise" : "?",
            base_name, line, function, lcont);
 }
 
-static void lan9662_printf_trace_head(const lan9662_trace_group_t group,
-                                      const lan9662_trace_level_t level,
-                                      const char *file,
-                                      const int line,
-                                      const char *function,
-                                      const char *lcont)
+static void mera_printf_trace_head(const mera_trace_group_t group,
+                                   const mera_trace_level_t level,
+                                   const char *file,
+                                   const int line,
+                                   const char *function,
+                                   const char *lcont)
 {
     printf_trace_head(trace_module.name,
                       group < TRACE_GROUP_CNT ? trace_groups[group].name : "?",
@@ -85,17 +85,17 @@ static void lan9662_printf_trace_head(const lan9662_trace_group_t group,
                       lcont);
 }
 
-void lan9662_callout_trace_printf(const lan9662_trace_group_t group,
-                                  const lan9662_trace_level_t level,
-                                  const char *file,
-                                  const int line,
-                                  const char *function,
-                                  const char *format,
-                                  ...)
+void mera_callout_trace_printf(const mera_trace_group_t group,
+                               const mera_trace_level_t level,
+                               const char *file,
+                               const int line,
+                               const char *function,
+                               const char *format,
+                               ...)
 {
     va_list args;
 
-    lan9662_printf_trace_head(group, level, file, line, function, ": ");
+    mera_printf_trace_head(group, level, file, line, function, ": ");
     va_start(args, format);
     vprintf(format, args);
     va_end(args);
@@ -105,7 +105,7 @@ void lan9662_callout_trace_printf(const lan9662_trace_group_t group,
 
 void mscc_appl_trace_printf(const char *mname,
                             const char *gname,
-                            const lan9662_trace_level_t level,
+                            const mera_trace_level_t level,
                             const char *file,
                             const int line,
                             const char *function,
@@ -121,7 +121,7 @@ void mscc_appl_trace_printf(const char *mname,
 
 void mscc_appl_trace_vprintf(const char *mname,
                              const char *gname,
-                             const lan9662_trace_level_t level,
+                             const mera_trace_level_t level,
                              const char *file,
                              const int line,
                              const char *function,
@@ -152,7 +152,7 @@ static void trace_hex(const unsigned char *byte_p, int byte_cnt)
 
 void mscc_appl_trace_hex(const char *mname,
                          const char *gname,
-                         const lan9662_trace_level_t level,
+                         const mera_trace_level_t level,
                          const char *file,
                          const int line,
                          const char *function,
@@ -166,15 +166,15 @@ void mscc_appl_trace_hex(const char *mname,
     trace_hex(byte_p, byte_cnt);
 }
 
-void lan9662_callout_trace_hex_dump(const lan9662_trace_group_t group,
-                                    const lan9662_trace_level_t level,
+void mera_callout_trace_hex_dump(const mera_trace_group_t group,
+                                    const mera_trace_level_t level,
                                     const char               *file,
                                     const int                line,
                                     const char               *function,
                                     const unsigned char      *byte_p,
                                     const int                byte_cnt)
 {
-    lan9662_printf_trace_head(group, level, file, line, function, "\n");
+    mera_printf_trace_head(group, level, file, line, function, "\n");
     trace_hex(byte_p, byte_cnt);
 }
 
@@ -187,17 +187,17 @@ void lan9662_callout_trace_hex_dump(const lan9662_trace_group_t group,
 typedef struct {
     char                  module_name[TRACE_NAME_MAX];
     char                  group_name[TRACE_NAME_MAX];
-    lan9662_trace_level_t level;
-    lan9662_debug_group_t group;
+    mera_trace_level_t level;
+    mera_debug_group_t group;
     int                   clear;
     int                   full;
 } trace_cli_req_t;
 
-static void trace_control(char *module_name, char *group_name, lan9662_trace_level_t level, int set)
+static void trace_control(char *module_name, char *group_name, mera_trace_level_t level, int set)
 {
     mscc_appl_trace_module_t *module;
     mscc_appl_trace_group_t  *group;
-    lan9662_trace_conf_t     conf;
+    mera_trace_conf_t     conf;
     int                      first = 1;
     int                      i;
 
@@ -221,20 +221,20 @@ static void trace_control(char *module_name, char *group_name, lan9662_trace_lev
                 cli_printf("%-9s%-12s%s\n",
                            module->name,
                            group->name,
-                           level == LAN9662_TRACE_LEVEL_NONE ? "off" :
-                           level == LAN9662_TRACE_LEVEL_ERROR ? "error" :
-                           level == LAN9662_TRACE_LEVEL_INFO ? "info" :
-                           level == LAN9662_TRACE_LEVEL_DEBUG ? "debug" :
-                           level == LAN9662_TRACE_LEVEL_NOISE ? "noise" : "?");
+                           level == MERA_TRACE_LEVEL_NONE ? "off" :
+                           level == MERA_TRACE_LEVEL_ERROR ? "error" :
+                           level == MERA_TRACE_LEVEL_INFO ? "info" :
+                           level == MERA_TRACE_LEVEL_DEBUG ? "debug" :
+                           level == MERA_TRACE_LEVEL_NOISE ? "noise" : "?");
             }
         }
     }
     if (set) {
         // Update API trace configuration
         for (i = 0; i < TRACE_GROUP_CNT; i++) {
-            if (lan9662_trace_conf_get(i, &conf) == 0) {
+            if (mera_trace_conf_get(i, &conf) == 0) {
                 conf.level = trace_groups[i].level;
-                lan9662_trace_conf_set(i, &conf);
+                mera_trace_conf_set(i, &conf);
             }
         }
     }
@@ -247,29 +247,29 @@ static void cli_cmd_debug_trace(cli_req_t *req)
     trace_control(mreq->module_name, mreq->group_name, mreq->level, req->set);
 }
 
-static const char *const cli_api_group_table[LAN9662_DEBUG_GROUP_CNT] = {
-    [LAN9662_DEBUG_GROUP_ALL] = "all",
-    [LAN9662_DEBUG_GROUP_GEN] = "gen",
-    [LAN9662_DEBUG_GROUP_IB]  = "ib",
-    [LAN9662_DEBUG_GROUP_OB]  = "ob",
+static const char *const cli_api_group_table[MERA_DEBUG_GROUP_CNT] = {
+    [MERA_DEBUG_GROUP_ALL] = "all",
+    [MERA_DEBUG_GROUP_GEN] = "gen",
+    [MERA_DEBUG_GROUP_IB]  = "ib",
+    [MERA_DEBUG_GROUP_OB]  = "ob",
 };
 
 static void cli_cmd_debug_api(cli_req_t *req)
 {
-    lan9662_debug_info_t info;
+    mera_debug_info_t info;
     int                  group;
     trace_cli_req_t      *mreq = req->module_req;
 
-    if (mreq->group == LAN9662_DEBUG_GROUP_CNT) {
+    if (mreq->group == MERA_DEBUG_GROUP_CNT) {
         cli_printf("Legal groups are:\n\n");
-        for (group = 0; group < LAN9662_DEBUG_GROUP_CNT; group++) {
+        for (group = 0; group < MERA_DEBUG_GROUP_CNT; group++) {
             cli_printf("%s\n", cli_api_group_table[group]);
         }
-    } else if (lan9662_debug_info_get(&info) == 0) {
+    } else if (mera_debug_info_get(&info) == 0) {
         info.group = mreq->group;
         info.full = mreq->full;
         info.clear = mreq->clear;
-        lan9662_debug_info_print(NULL, cli_printf, &info);
+        mera_debug_info_print(NULL, cli_printf, &info);
     }
 }
 
@@ -348,17 +348,17 @@ static int cli_parm_keyword(cli_req_t *req)
     if (!strncmp(found, "clear", 5))
         mreq->clear = 1;
     else if (!strncmp(found, "debug", 5))
-        mreq->level = LAN9662_TRACE_LEVEL_DEBUG;
+        mreq->level = MERA_TRACE_LEVEL_DEBUG;
     else if (!strncmp(found, "error", 5))
-        mreq->level = LAN9662_TRACE_LEVEL_ERROR;
+        mreq->level = MERA_TRACE_LEVEL_ERROR;
     else if (!strncmp(found, "full", 4))
         mreq->full = 1;
     else if (!strncmp(found, "info", 4))
-        mreq->level = LAN9662_TRACE_LEVEL_INFO;
+        mreq->level = MERA_TRACE_LEVEL_INFO;
     else if (!strncmp(found, "noise", 5))
-        mreq->level = LAN9662_TRACE_LEVEL_NOISE;
+        mreq->level = MERA_TRACE_LEVEL_NOISE;
     else if (!strncmp(found, "off", 3))
-        mreq->level = LAN9662_TRACE_LEVEL_NONE;
+        mreq->level = MERA_TRACE_LEVEL_NONE;
     else
         cli_printf("no match:%s\n",found);
 
@@ -374,11 +374,11 @@ static int cli_parm_api_group(cli_req_t *req)
 
     /* Accept 'show' keyword to display groups */
     if (strstr(txt, req->cmd) == txt) {
-        mreq->group = LAN9662_DEBUG_GROUP_CNT;
+        mreq->group = MERA_DEBUG_GROUP_CNT;
         return 0;
     }
 
-    for (group = 0; group < LAN9662_DEBUG_GROUP_CNT; group++) {
+    for (group = 0; group < MERA_DEBUG_GROUP_CNT; group++) {
         txt = cli_api_group_table[group];
         if (txt != NULL && strstr(txt, req->cmd) == txt) {
             /* Found matching group */
@@ -514,7 +514,7 @@ void mscc_appl_trace_register(mscc_appl_trace_module_t *module,
 static int trace_option(char *parm)
 {
     char                  *module_name, *group_name, *level_name, c;
-    lan9662_trace_level_t level;
+    mera_trace_level_t level;
 
     module_name = strtok(parm, ":");
     group_name = strtok(NULL, ":");
@@ -531,12 +531,12 @@ static int trace_option(char *parm)
         *group_name = 0;
     }
     c = (level_name != NULL && strlen(level_name) ? level_name[0] : 'z');
-    level = (c == 'o' ? LAN9662_TRACE_LEVEL_NONE :
-             c == 'e' ? LAN9662_TRACE_LEVEL_ERROR :
-             c == 'i' ? LAN9662_TRACE_LEVEL_INFO :
-             c == 'd' ? LAN9662_TRACE_LEVEL_DEBUG :
-             c == 'n' ? LAN9662_TRACE_LEVEL_NOISE : LAN9662_TRACE_LEVEL_CNT);
-    if (level == LAN9662_TRACE_LEVEL_CNT) {
+    level = (c == 'o' ? MERA_TRACE_LEVEL_NONE :
+             c == 'e' ? MERA_TRACE_LEVEL_ERROR :
+             c == 'i' ? MERA_TRACE_LEVEL_INFO :
+             c == 'd' ? MERA_TRACE_LEVEL_DEBUG :
+             c == 'n' ? MERA_TRACE_LEVEL_NOISE : MERA_TRACE_LEVEL_CNT);
+    if (level == MERA_TRACE_LEVEL_CNT) {
         fprintf(stderr, "illegal trace level\n");
         return -1;
     }
