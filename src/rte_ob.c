@@ -5,8 +5,8 @@
 #include "rte_private.h"
 
 // Profinet DataStatus value/mask
-#define RTE_OB_PN_DS_MASK 0x37
-#define RTE_OB_PN_DS_VAL  0x37
+#define RTE_OB_PN_DS_MASK 0xb7
+#define RTE_OB_PN_DS_VAL  0x35
 
 int lan9662_ob_init(struct lan9662_rte_inst *inst)
 {
@@ -19,7 +19,7 @@ int lan9662_ob_init(struct lan9662_rte_inst *inst)
 
     // Data/transfer status checks
     REG_WR(RTE_OUTB_PN_PDU_MISC,
-           RTE_OUTB_PN_PDU_MISC_PN_DATA_STATUS_MASK(0x37) |
+           RTE_OUTB_PN_PDU_MISC_PN_DATA_STATUS_MASK(RTE_OB_PN_DS_MASK) |
            RTE_OUTB_PN_PDU_MISC_PN_DATA_STATUS_VALID_CHK_ENA(0) |
            RTE_OUTB_PN_PDU_MISC_PN_TRANSFER_STATUS_CHK_ENA(1));
 

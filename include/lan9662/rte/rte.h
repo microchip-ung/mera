@@ -66,7 +66,7 @@ typedef enum {
 typedef struct {
     lan9662_rtp_type_t type;        // RTP entry type
     uint16_t           length;      // Number of bytes after Etype, excluding FCS (zero disables length check)
-    uint8_t            pn_ds;       // Profinet DataStatus, matched using mask 0x37
+    uint8_t            pn_ds;       // Profinet DataStatus, matched using mask 0xb7 (ignore bit 3 and 6)
     uint32_t           opc_grp_ver; // OPC GroupVersion
 } lan9662_rte_ob_rtp_conf_t;
 
