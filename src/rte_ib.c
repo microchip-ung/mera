@@ -119,6 +119,24 @@ int mera_ib_rtp_conf_set(struct mera_inst         *inst,
     return 0;
 }
 
+int mera_ib_flush(struct mera_inst *inst)
+{
+    mera_ib_t           *ib;
+    mera_ib_rtp_entry_t *rtp;
+    uint32_t            i;
+
+    inst = mera_inst_get(inst);
+    ib = &inst->ib;
+    for (i = 1; i < RTE_OB_RTP_CNT; i++) {
+        rtp = &ib->rtp_tbl[i];
+        REG_WR(RTE_INB_RTP_FRM_PORT(i), 0);
+        REG_WR(RTE_INB_RTP_MISC(i),0);
+        memset(rtp, 0, sizeof(*rtp));
+    }
+    ib->frm_data_addr = 0;
+    return 0;
+}
+
 static int mera_ib_rtp_counters_update(struct mera_inst       *inst,
                                        const mera_rtp_id_t    rtp_id,
                                        mera_ib_rtp_counters_t *const counters,

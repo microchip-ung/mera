@@ -100,8 +100,6 @@ $methods_blacklist = [
     "mera_callout_trace_printf",
     "mera_debug_info_get",
     "mera_debug_info_print",
-    "mera_ob_dg_data_get",
-    "mera_ob_dg_data_bulk_get",
 ]
 
 $methods_greylist = [

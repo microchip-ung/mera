@@ -65,7 +65,6 @@ typedef enum {
 
 /* - RTE Outbound -------------------------------------------------- */
 
-
 // RTP Outbound configuration
 typedef struct {
     mera_rtp_type_t type;        // RTP entry type
@@ -102,22 +101,8 @@ int mera_ob_rtp_pdu2dg_add(struct mera_inst                *inst,
                            const mera_rtp_id_t             rtp_id,
                            const mera_ob_rtp_pdu2dg_conf_t *const conf);
 
-// Clear all PDU-to-DG entries
-int mera_ob_rtp_pdu2dg_clr(struct mera_inst    *inst,
-                           const mera_rtp_id_t rtp_id);
-
-// For debugging only. Notice that it is a 2-buffer system from pdu to dg,
-// meaning that we need to use RTE:OUTB_DG_DATA_RTP_CTRL:OUTB_DG_DATA_RTP_CTRL
-// to read the latest updated section, or just inject 2 frames to update both of
-// them.
-int mera_ob_dg_data_get(struct mera_inst *inst,
-                        uint32_t         addr,
-                        uint32_t         *value);
-
-int mera_ob_dg_data_bulk_get(struct mera_inst *inst,
-                             uint32_t         addr,
-                             uint32_t         length,
-                             uint32_t         *value);
+// Flush all outbound configuration
+int mera_ob_flush(struct mera_inst *inst);
 
 // TODO: Once we can find the PDU data in the DG memory, then we need to
 // continue and do the 3-buffer operation
@@ -166,6 +151,9 @@ int mera_ib_rtp_conf_get(struct mera_inst    *inst,
 int mera_ib_rtp_conf_set(struct mera_inst         *inst,
                          const mera_rtp_id_t      rtp_id,
                          const mera_ib_rtp_conf_t *const conf);
+
+// Flush all inbound configuration
+int mera_ib_flush(struct mera_inst *inst);
 
 // Inbound counters
 typedef struct {

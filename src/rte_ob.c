@@ -201,33 +201,39 @@ int mera_ob_rtp_pdu2dg_add(struct mera_inst                *inst,
     return 0;
 }
 
-int mera_ob_rtp_pdu2dg_clr(struct mera_inst    *inst,
-                           const mera_rtp_id_t rtp_id)
+int mera_ob_flush(struct mera_inst *inst)
 {
     mera_ob_t           *ob;
     mera_ob_dg_entry_t  *dg;
     mera_ob_rtp_entry_t *rtp;
-    uint16_t            i, addr, prev_addr;
+    uint16_t            i, j, addr, prev_addr;
 
     T_I("enter");
     inst = mera_inst_get(inst);
-    MERA_RC(mera_rtp_check(rtp_id));
-
-    // Clear list in state and hardware
     ob = &inst->ob;
-    rtp = &ob->rtp_tbl[rtp_id];
-    for (i = 0, addr = rtp->addr, prev_addr = addr; addr != 0; i++) {
-        if (i < 3) {
-            REG_WR(RTE_OUTB_DG_ADDR(rtp_id, i), RTE_OUTB_DG_ADDR_DG_ADDR(0));
-        } else {
-            REG_WR(RTE_OUTB_DG_MISC(prev_addr), RTE_OUTB_DG_MISC_DG_ADDR(0));
-            prev_addr = ob->dg_tbl[prev_addr].addr;
+
+    // Clear lists in state and hardware
+    for (i = 1; i < RTE_OB_RTP_CNT; i++) {
+        rtp = &ob->rtp_tbl[i];
+        for (j = 0, addr = rtp->addr, prev_addr = addr; addr != 0; j++) {
+            if (j < 3) {
+                REG_WR(RTE_OUTB_DG_ADDR(i, j), RTE_OUTB_DG_ADDR_DG_ADDR(0));
+            } else {
+                REG_WR(RTE_OUTB_DG_MISC(prev_addr), RTE_OUTB_DG_MISC_DG_ADDR(0));
+                prev_addr = ob->dg_tbl[prev_addr].addr;
+            }
+            REG_WR(RTE_OUTB_DG_DATA_SECTION_ADDR(addr),
+                   RTE_OUTB_DG_DATA_SECTION_ADDR_DG_DATA_SECTION_ADDR(0) |
+                   RTE_OUTB_DG_DATA_SECTION_ADDR_DG_DATA_LEN(0));
+            dg = &ob->dg_tbl[addr];
+            addr = dg->addr;
+            memset(dg, 0, sizeof(*dg));
+            dg->addr = addr; // Restore address used as prev_addr
         }
-        dg = &ob->dg_tbl[addr];
-        dg->rtp_id = 0;
-        addr = dg->addr;
+        memset(rtp, 0, sizeof(*rtp));
+        REG_WR(RTE_OUTB_RTP_MISC(i), 0);
     }
-    rtp->addr = 0;
+    ob->dg_addr = 0;
     return 0;
 }
 
