@@ -53,6 +53,9 @@ int mera_poll(struct mera_inst *inst);
 // Number of 1-based RTP IDs
 #define MERA_RTP_CNT 31
 
+// RTP ID
+typedef uint16_t mera_rtp_id_t;
+
 // RTP entry type
 typedef enum {
     MERA_RTP_TYPE_DISABLED, // Disabled
@@ -61,6 +64,7 @@ typedef enum {
 } mera_rtp_type_t;
 
 /* - RTE Outbound -------------------------------------------------- */
+
 
 // RTP Outbound configuration
 typedef struct {
@@ -71,20 +75,23 @@ typedef struct {
 } mera_ob_rtp_conf_t;
 
 // Get RTP Outbound configuration
-int mera_ob_rtp_conf_get(struct mera_inst   *inst,
-                         const uint16_t     rtp_id,
-                         mera_ob_rtp_conf_t *const conf);
+int mera_ob_rtp_conf_get(struct mera_inst    *inst,
+                         const mera_rtp_id_t rtp_id,
+                         mera_ob_rtp_conf_t  *const conf);
 
 // Set RTP Outbound configuration
 int mera_ob_rtp_conf_set(struct mera_inst         *inst,
-                         const uint16_t           rtp_id,
+                         const mera_rtp_id_t      rtp_id,
                          const mera_ob_rtp_conf_t *const conf);
+
+// Outbound data group ID, must be unique for RTP
+typedef uint16_t mera_ob_dg_id_t;
 
 // RTP PDU-to-DG configuration
 typedef struct {
-    uint32_t pdu_offset;
-    uint32_t length;
-    uint32_t dg_addr;
+    mera_ob_dg_id_t id;         // Data group ID
+    uint16_t        pdu_offset; // PDU offset after Ethernet Type
+    uint16_t        length;     // Data length
 } mera_ob_rtp_pdu2dg_conf_t;
 
 // Initalize PDU-to-DG configuration
@@ -92,12 +99,12 @@ int mera_ob_rtp_pdu2dg_init(mera_ob_rtp_pdu2dg_conf_t *const conf);
 
 // Add PDU-to-DG configuration
 int mera_ob_rtp_pdu2dg_add(struct mera_inst                *inst,
-                           const uint16_t                  rtp_id,
+                           const mera_rtp_id_t             rtp_id,
                            const mera_ob_rtp_pdu2dg_conf_t *const conf);
 
 // Clear all PDU-to-DG entries
-int mera_ob_rtp_pdu2dg_clr(struct mera_inst *inst,
-                           const uint16_t   rtp_id);
+int mera_ob_rtp_pdu2dg_clr(struct mera_inst    *inst,
+                           const mera_rtp_id_t rtp_id);
 
 // For debugging only. Notice that it is a 2-buffer system from pdu to dg,
 // meaning that we need to use RTE:OUTB_DG_DATA_RTP_CTRL:OUTB_DG_DATA_RTP_CTRL
@@ -122,11 +129,11 @@ typedef struct {
 } mera_ob_rtp_counters_t;
 
 int mera_ob_rtp_counters_get(struct mera_inst       *inst,
-                             const uint16_t         rtp_id,
+                             const mera_rtp_id_t    rtp_id,
                              mera_ob_rtp_counters_t *const counters);
 
-int mera_ob_rtp_counters_clr(struct mera_inst *inst,
-                             const uint16_t   rtp_id);
+int mera_ob_rtp_counters_clr(struct mera_inst    *inst,
+                             const mera_rtp_id_t rtp_id);
 
 /* - RTE Inbound --------------------------------------------------- */
 
@@ -151,13 +158,13 @@ typedef struct {
 } mera_ib_rtp_conf_t;
 
 // Get RTP Outbound configuration
-int mera_ib_rtp_conf_get(struct mera_inst   *inst,
-                         const uint16_t     rtp_id,
-                         mera_ib_rtp_conf_t *const conf);
+int mera_ib_rtp_conf_get(struct mera_inst    *inst,
+                         const mera_rtp_id_t rtp_id,
+                         mera_ib_rtp_conf_t  *const conf);
 
 // Set RTP Outbound configuration
 int mera_ib_rtp_conf_set(struct mera_inst         *inst,
-                         const uint16_t           rtp_id,
+                         const mera_rtp_id_t      rtp_id,
                          const mera_ib_rtp_conf_t *const conf);
 
 // Inbound counters
@@ -167,11 +174,11 @@ typedef struct {
 } mera_ib_rtp_counters_t;
 
 int mera_ib_rtp_counters_get(struct mera_inst       *inst,
-                             const uint16_t         rtp_id,
+                             const mera_rtp_id_t    rtp_id,
                              mera_ib_rtp_counters_t *const counters);
 
-int mera_ib_rtp_counters_clr(struct mera_inst *inst,
-                             const uint16_t   rtp_id);
+int mera_ib_rtp_counters_clr(struct mera_inst    *inst,
+                             const mera_rtp_id_t rtp_id);
 
 /* - Trace --------------------------------------------------------- */
 

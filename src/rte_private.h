@@ -59,14 +59,16 @@ typedef struct {
 
 // DG entry
 typedef struct {
-    mera_ob_rtp_pdu2dg_conf_t conf;   // Configuration
-    uint16_t                  rtp_id; // Zero indicates free entry
-    uint16_t                  addr;   // Next address
+    mera_ob_rtp_pdu2dg_conf_t conf;    // Configuration
+    mera_rtp_id_t             rtp_id;  // Zero indicates free entry
+    uint16_t                  addr;    // Next address
+    uint16_t                  dg_addr; // Allocated DG address
 } mera_ob_dg_entry_t;
 
 // RTE OB state
 typedef struct {
-    uint16_t            rtp_id;
+    mera_rtp_id_t       rtp_id;
+    uint16_t            dg_addr; // Next free DG address
     mera_ob_rtp_entry_t rtp_tbl[RTE_OB_RTP_CNT];
     mera_ob_dg_entry_t  dg_tbl[RTE_OB_DG_CNT];
 } mera_ob_t;
@@ -80,7 +82,7 @@ typedef struct {
 
 // RTE IB state
 typedef struct {
-    uint16_t            rtp_id;
+    mera_rtp_id_t       rtp_id;
     uint32_t            frm_data_addr;
     mera_ib_rtp_entry_t rtp_tbl[RTE_IB_RTP_CNT];
 } mera_ib_t;
@@ -95,7 +97,7 @@ typedef struct mera_inst {
 
 struct mera_inst *mera_inst_get(struct mera_inst *inst);
 
-int mera_rtp_check(uint16_t rtp_id);
+int mera_rtp_check(const mera_rtp_id_t rtp_id);
 void mera_cnt_16_update(uint16_t value, mera_counter_t *counter, int clear);
 
 

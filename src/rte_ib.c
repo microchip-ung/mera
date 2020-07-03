@@ -10,9 +10,9 @@ int mera_ib_init(struct mera_inst *inst)
     return 0;
 }
 
-int mera_ib_rtp_conf_get(struct mera_inst   *inst,
-                         const uint16_t     rtp_id,
-                         mera_ib_rtp_conf_t *const conf)
+int mera_ib_rtp_conf_get(struct mera_inst    *inst,
+                         const mera_rtp_id_t rtp_id,
+                         mera_ib_rtp_conf_t  *const conf)
 {
     T_I("enter");
     inst = mera_inst_get(inst);
@@ -24,7 +24,7 @@ int mera_ib_rtp_conf_get(struct mera_inst   *inst,
 #define IFH_LEN 28
 
 int mera_ib_rtp_conf_set(struct mera_inst         *inst,
-                         const uint16_t           rtp_id,
+                         const mera_rtp_id_t      rtp_id,
                          const mera_ib_rtp_conf_t *const conf)
 {
     mera_ib_t *ib;
@@ -120,7 +120,7 @@ int mera_ib_rtp_conf_set(struct mera_inst         *inst,
 }
 
 static int mera_ib_rtp_counters_update(struct mera_inst       *inst,
-                                       const uint16_t         rtp_id,
+                                       const mera_rtp_id_t    rtp_id,
                                        mera_ib_rtp_counters_t *const counters,
                                        int                    clear)
 {
@@ -141,7 +141,7 @@ static int mera_ib_rtp_counters_update(struct mera_inst       *inst,
 }
 
 int mera_ib_rtp_counters_get(struct mera_inst       *inst,
-                             const uint16_t         rtp_id,
+                             const mera_rtp_id_t    rtp_id,
                              mera_ib_rtp_counters_t *const counters)
 {
     T_I("enter");
@@ -150,8 +150,8 @@ int mera_ib_rtp_counters_get(struct mera_inst       *inst,
     return mera_ib_rtp_counters_update(inst, rtp_id, counters, 0);
 }
 
-int mera_ib_rtp_counters_clr(struct mera_inst *inst,
-                             const uint16_t   rtp_id)
+int mera_ib_rtp_counters_clr(struct mera_inst    *inst,
+                             const mera_rtp_id_t rtp_id)
 {
     T_I("enter");
     inst = mera_inst_get(inst);
@@ -176,8 +176,8 @@ int mera_ib_poll(struct mera_inst *inst)
 }
 
 int mera_ib_debug_print(struct mera_inst *inst,
-                           const mera_debug_printf_t pr,
-                           const mera_debug_info_t   *const info)
+                        const mera_debug_printf_t pr,
+                        const mera_debug_info_t   *const info)
 {
     mera_ib_t           *ib = &inst->ib;
     mera_ib_rtp_entry_t *rtp;
