@@ -50,11 +50,24 @@ int mera_gen_conf_set(struct mera_inst      *inst,
 // Poll statistics, call approximately every second
 int mera_poll(struct mera_inst *inst);
 
-// Number of 1-based RTP IDs
-#define MERA_RTP_CNT 31
+// Indicate FPGA implementation for now
+#define MERA_FPGA 1
 
-// RTP ID
+// Number RTP IDs (1-based)
+#if defined(MERA_FPGA)
+#define MERA_RTP_CNT 31
+#else
+#define MERA_RTP_CNT 512
+#endif
+
+// RTP ID (1-based)
 typedef uint16_t mera_rtp_id_t;
+
+// Number of Outbound Write Action List IDs (0-based)
+#define MERA_OB_WAL_CNT MERA_RTP_CNT
+
+// Outbound Write Action List ID (0-based)
+typedef uint16_t mera_ob_wal_id_t;
 
 // RTP entry type
 typedef enum {
@@ -67,10 +80,12 @@ typedef enum {
 
 // RTP Outbound configuration
 typedef struct {
-    mera_rtp_type_t type;        // RTP entry type
-    uint16_t        length;      // Number of bytes after Etype, excluding FCS (zero disables length check)
-    uint8_t         pn_ds;       // Profinet DataStatus, matched using mask 0xb7 (ignore bit 3 and 6)
-    uint32_t        opc_grp_ver; // OPC GroupVersion
+    mera_rtp_type_t  type;        // RTP entry type
+    uint16_t         length;      // Number of bytes after Etype, excluding FCS (zero disables length check)
+    uint8_t          pn_ds;       // Profinet DataStatus, matched using mask 0xb7 (ignore bit 3 and 6)
+    uint32_t         opc_grp_ver; // OPC GroupVersion
+    mera_bool_t      wal_enable;  // Trigger Write Action List
+    mera_ob_wal_id_t wal_id;      // Write Action List ID
 } mera_ob_rtp_conf_t;
 
 // Get RTP Outbound configuration
@@ -100,6 +115,39 @@ int mera_ob_rtp_pdu2dg_init(mera_ob_rtp_pdu2dg_conf_t *const conf);
 int mera_ob_rtp_pdu2dg_add(struct mera_inst                *inst,
                            const mera_rtp_id_t             rtp_id,
                            const mera_ob_rtp_pdu2dg_conf_t *const conf);
+
+// Outbound Write Action List configuration
+typedef struct {
+    uint32_t time; // Time [nsec]
+} mera_ob_wal_conf_t;
+
+// Get Outbound Write Action List configuration
+int mera_ob_wal_conf_get(struct mera_inst       *inst,
+                         const mera_ob_wal_id_t wal_id,
+                         mera_ob_wal_conf_t     *const conf);
+
+// Set Outbound Write Action List configuration
+int mera_ob_wal_conf_set(struct mera_inst         *inst,
+                         const mera_ob_wal_id_t   wal_id,
+                         const mera_ob_wal_conf_t *const conf);
+
+// Outbound Write Action configuration
+typedef struct {
+    mera_bool_t     internal; // Internal data transfer or data group transfer
+    mera_rtp_id_t   rtp_id;   // RTP ID (non-internal transfer)
+    mera_ob_dg_id_t dg_id;    // Data group ID (non-internal transfer)
+    uint32_t        rd_addr;  // Read address (internal transfer)
+    uint16_t        length;   // Data length (internal transfer)
+    uint32_t        wr_addr;  // Write address
+} mera_ob_wa_conf_t;
+
+// Initialize Write Action configuration
+int mera_ob_wa_init(mera_ob_wa_conf_t *const conf);
+
+// Add Write Action configuration
+int mera_ob_wa_add(struct mera_inst        *inst,
+                   const mera_ob_wal_id_t  wal_id,
+                   const mera_ob_wa_conf_t *const conf);
 
 // Flush all outbound configuration
 int mera_ob_flush(struct mera_inst *inst);

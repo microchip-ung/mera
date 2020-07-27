@@ -58,8 +58,8 @@ int mera_ob_rtp_conf_get(struct mera_inst    *inst,
                          mera_ob_rtp_conf_t  *const conf)
 {
     T_I("enter");
-    inst = mera_inst_get(inst);
     MERA_RC(mera_rtp_check(rtp_id));
+    inst = mera_inst_get(inst);
     *conf = inst->ob.rtp_tbl[rtp_id].conf;
     return 0;
 }
@@ -72,8 +72,8 @@ int mera_ob_rtp_conf_set(struct mera_inst         *inst,
     uint32_t ena = (conf->type == MERA_RTP_TYPE_DISABLED ? 0 : 1);
 
     T_I("enter");
-    inst = mera_inst_get(inst);
     MERA_RC(mera_rtp_check(rtp_id));
+    inst = mera_inst_get(inst);
     inst->ob.rtp_tbl[rtp_id].conf = *conf;
     REG_WR(RTE_OUTB_RTP_MISC(rtp_id),
            RTE_OUTB_RTP_MISC_RTP_GRP_ID(0) |
@@ -116,8 +116,8 @@ int mera_ob_rtp_pdu2dg_add(struct mera_inst                *inst,
     uint16_t            i, addr, new = 0, prev_addr, found = 0, cnt;
 
     T_I("enter");
-    inst = mera_inst_get(inst);
     MERA_RC(mera_rtp_check(rtp_id));
+    inst = mera_inst_get(inst);
 
     if (conf->length == 0) {
         T_E("length must be non-zero");
@@ -196,7 +196,149 @@ int mera_ob_rtp_pdu2dg_add(struct mera_inst                *inst,
         REG_WR(RTE_OUTB_DG_DATA_SECTION_ADDR(addr),
                RTE_OUTB_DG_DATA_SECTION_ADDR_DG_DATA_SECTION_ADDR(dg->dg_addr) |
                RTE_OUTB_DG_DATA_SECTION_ADDR_DG_DATA_LEN(dg->conf.length));
+        REG_WR(RTE_OUTB_PN_IOPS(addr),
+               RTE_OUTB_PN_IOPS_PN_IOPS_VAL(0) |
+               RTE_OUTB_PN_IOPS_PN_IOPS_OFFSET_PDU_POS(dg->conf.pdu_offset) |
+               RTE_OUTB_PN_IOPS_PN_IOPS_CHK_ENA(0) | // TBD: Enabling IOPS check seems to prevent DG copy
+               RTE_OUTB_PN_IOPS_PN_IOPS_MISMATCH_SKIP_ENA(1));
         addr = dg->addr;
+    }
+    return 0;
+}
+
+static int mera_wal_check(const mera_ob_wal_id_t wal_id)
+{
+    if (wal_id >= MERA_OB_WAL_CNT) {
+        T_E("illegal wal_id: %u", wal_id);
+        return -1;
+    }
+    return 0;
+}
+
+int mera_ob_wal_conf_get(struct mera_inst       *inst,
+                         const mera_ob_wal_id_t wal_id,
+                         mera_ob_wal_conf_t     *const conf)
+{
+    MERA_RC(mera_wal_check(wal_id));
+    inst = mera_inst_get(inst);
+    *conf = inst->ob.wal_tbl[wal_id].conf;
+    return 0;
+}
+
+int mera_ob_wal_conf_set(struct mera_inst         *inst,
+                         const mera_ob_wal_id_t   wal_id,
+                         const mera_ob_wal_conf_t *const conf)
+{
+    uint32_t value;
+
+    MERA_RC(mera_wal_check(wal_id));
+    inst = mera_inst_get(inst);
+    inst->ob.wal_tbl[wal_id].conf = *conf;
+    REG_RD(RTE_SC_TIME, &value);
+    value = (conf->time ? 0 : RTE_SC_TIME_SC_RUT_CNT_X(value));
+    REG_WR(RTE_OUTB_WR_TIMER_CFG1(wal_id), RTE_OUTB_WR_TIMER_CFG1_FIRST_RUT_CNT(value));
+    REG_WR(RTE_OUTB_WR_TIMER_CFG2(wal_id),
+           RTE_OUTB_WR_TIMER_CFG2_DELTA_RUT_CNT(MERA_RUT_TIME(conf->time)));
+    REG_WR(RTE_OUTB_TIMER_CMD,
+           RTE_OUTB_TIMER_CMD_TIMER_CMD(2) |
+           RTE_OUTB_TIMER_CMD_TIMER_RSLT(0) |
+           RTE_OUTB_TIMER_CMD_TIMER_TYPE(1) |
+           RTE_OUTB_TIMER_CMD_TIMER_IDX(wal_id));
+    return 0;
+}
+
+int mera_ob_wa_init(mera_ob_wa_conf_t *const conf)
+{
+    memset(conf, 0, sizeof(*conf));
+    return 0;
+}
+
+int mera_ob_wa_add(struct mera_inst        *inst,
+                   const mera_ob_wal_id_t  wal_id,
+                   const mera_ob_wa_conf_t *const conf)
+{
+    mera_ob_t           *ob;
+    mera_ob_wal_entry_t *wal;
+    mera_ob_wa_entry_t  *wa;
+    mera_ob_dg_entry_t  *dg = NULL;
+    mera_ob_rtp_entry_t *rtp;
+    uint16_t            i, addr, found = 0;
+
+    MERA_RC(mera_wal_check(wal_id));
+    inst = mera_inst_get(inst);
+    ob = &inst->ob;
+    wal = &ob->wal_tbl[wal_id];
+
+    if (conf->internal) {
+        // Internal transfer
+    } else {
+        // DG transfer
+        MERA_RC(mera_rtp_check(conf->rtp_id));
+        addr = ob->rtp_tbl[conf->rtp_id].addr;
+        while (addr != 0) {
+            dg = &ob->dg_tbl[addr];
+            if (dg->conf.id == conf->dg_id) {
+                found = 1;
+                break;
+            }
+            addr = dg->addr;
+        }
+        if (found == 0) {
+            T_E("DG ID %u not found", conf->dg_id);
+            return -1;
+        }
+    }
+
+    // Find free WA entry
+    for (addr = 1, found = 0; addr < RTE_OB_WA_CNT; addr++) {
+        wa = &ob->wa_tbl[addr];
+        if (wa->used == 0) {
+            // Insert first in list
+            wa->addr = wal->addr;
+            wal->addr = addr;
+            wa->used = 1;
+            wa->conf = *conf;
+            found = 1;
+            break;
+        }
+    }
+    if (!found) {
+        T_E("no more WA entries");
+        return -1;
+    }
+
+    // Update WA entry
+    REG_WR(RTE_WR_ACTION_DG_DATA(addr),
+           RTE_WR_ACTION_DG_DATA_DG_DATA_SECTION_ADDR(dg ? dg->dg_addr : 0) |
+           RTE_WR_ACTION_DG_DATA_DG_DATA_LEN(dg ? dg->conf.length : conf->length) |
+           RTE_WR_ACTION_DG_DATA_DG_DATA_LATEST_INVLD_MODE(0));
+    REG_WR(RTE_WR_ACTION_MISC(addr),
+           RTE_WR_ACTION_MISC_OUTB_RTP_ID(dg ? conf->rtp_id : 0) |
+           RTE_WR_ACTION_MISC_WR_ACTION_ADDR(wa->addr) |
+           RTE_WR_ACTION_MISC_BUF3_WR_MODE(0) |
+           RTE_WR_ACTION_MISC_HW_WR_DIS_MODE(0) |
+           RTE_WR_ACTION_MISC_INTERN_ENA(dg ? 0 : 1) |
+           RTE_WR_ACTION_MISC_TRANSFER_PROTECT_ENA(0) |
+           RTE_WR_ACTION_MISC_RTP_STOPPED_MODE(0));
+    REG_WR(RTE_WR_RAI_ADDR(addr), conf->wr_addr);
+    REG_WR(RTE_WR_ACTION_RTP_GRP(addr),
+           RTE_WR_ACTION_RTP_GRP_RTP_GRP_ID(0) |
+           RTE_WR_ACTION_RTP_GRP_RTP_GRP_STOPPED_MODE(0));
+    REG_WR(RTE_RD_RAI_ADDR(addr), dg ? 0 : conf->rd_addr);
+    REG_WR(RTE_OFFSET_RAI_ADDR(addr), RTE_OFFSET_RAI_ADDR_OFFSET_RAI_ADDR(0));
+    REG_WR(RTE_BUF3_ADDR(addr), RTE_BUF3_ADDR_BUF3_ADDR(0));
+
+    // Update WAL
+    REG_WR(RTE_OUTB_WR_ACTION_ADDR(wal_id), RTE_OUTB_WR_ACTION_ADDR_WR_ACTION_ADDR(wal->addr));
+
+    // Update RTP WAL reference
+    for (i = 1; i < RTE_OB_RTP_CNT; i++) {
+        rtp = &ob->rtp_tbl[i];
+        if (rtp->conf.wal_enable && rtp->conf.wal_id == wal_id) {
+            REG_WRM(RTE_OUTB_RTP_MISC(i),
+                    RTE_OUTB_RTP_MISC_WR_ACTION_ADDR(wal->addr),
+                    RTE_OUTB_RTP_MISC_WR_ACTION_ADDR_M);
+        }
     }
     return 0;
 }
@@ -326,8 +468,11 @@ int mera_ob_debug_print(struct mera_inst *inst,
     mera_ob_t           *ob = &inst->ob;
     mera_ob_rtp_entry_t *rtp;
     mera_ob_dg_entry_t  *dg;
+    mera_ob_wal_entry_t *wal;
+    mera_ob_wa_entry_t  *wa;
     const char          *txt;
     uint32_t            value, len, pos, idx, i, j, addr = ob->dg_addr;
+    mera_bool_t         internal;
     char                buf[32];
     struct {
         uint32_t cnt;
@@ -357,6 +502,13 @@ int mera_ob_debug_print(struct mera_inst *inst,
         }
         pr("RTP ID: %u\n", i);
         pr("Type  : %s\n", txt);
+        pr("WAL ID: ");
+        if (rtp->conf.wal_enable) {
+            pr("%u", rtp->conf.wal_id);
+        } else {
+            pr("-");
+        }
+        pr("\n");
         while (addr != 0) {
             dg = &ob->dg_tbl[addr];
             if (addr == rtp->addr) {
@@ -365,6 +517,35 @@ int mera_ob_debug_print(struct mera_inst *inst,
             pr("  %-6u%-6u%-6u%-9u%u\n",
                dg->conf.id, addr, dg->conf.pdu_offset, dg->dg_addr, dg->conf.length);
             addr = dg->addr;
+        }
+        pr("\n");
+    }
+
+    for (i = 0; i < MERA_OB_WAL_CNT; i++) {
+        wal = &ob->wal_tbl[i];
+        addr = wal->addr;
+        if (addr == 0 && !info->full) {
+            continue;
+        }
+        pr("WAL ID: %u\n", i);
+        pr("Time  : %u.%03u usec\n", wal->conf.time / 1000, wal->conf.time % 1000);
+        while (addr != 0) {
+            wa = &ob->wa_tbl[addr];
+            if (addr == wal->addr) {
+                pr("\n  Addr  RTP  DG   RD Addr     Length  WR Addr\n");
+            }
+            pr("  %-6u", addr);
+            internal = wa->conf.internal;
+            sprintf(buf, "%u", wa->conf.rtp_id);
+            pr("%-5s", internal ? "-" : buf);
+            sprintf(buf, "%u", wa->conf.dg_id);
+            pr("%-5s", internal ? "-" : buf);
+            sprintf(buf, "0x%08x", wa->conf.rd_addr);
+            pr("%-12s", internal ? buf : "-");
+            sprintf(buf, "%u", wa->conf.length);
+            pr("%-8s", internal ? buf : "-");
+            pr("0x%08x\n", wa->conf.wr_addr);
+            addr = wa->addr;
         }
         pr("\n");
     }
@@ -474,34 +655,35 @@ int mera_ob_debug_print(struct mera_inst *inst,
         DBG_PR_REG_M("DG_ADDR", RTE_OUTB_DG_MISC_DG_ADDR, value);
         DBG_PR_REG_M("DBG_ENA", RTE_OUTB_DG_MISC_DG_DBG_ENA, value);
         DBG_REG(REG_ADDR(RTE_OUTB_DG_DATA_OFFSET_PDU_POS(i)), "PDU_POS");
+        REG_RD(RTE_OUTB_DG_DATA_SECTION_ADDR(i), &value);
         DBG_PR_REG("DATA_SECTION_ADDR", value);
         DBG_PR_REG_M("DATA_SECTION_ADDR", RTE_OUTB_DG_DATA_SECTION_ADDR_DG_DATA_SECTION_ADDR, value);
         DBG_PR_REG_M("DATA_LEN", RTE_OUTB_DG_DATA_SECTION_ADDR_DG_DATA_LEN, value);
         REG_RD(RTE_OUTB_PN_IOPS(i), &value);
         DBG_PR_REG("PN_IOPS", value);
-        DBG_PR_REG(":VAL", RTE_OUTB_PN_IOPS_PN_IOPS_VAL_X(value));
-        DBG_PR_REG(":OFFSET_PDU_POS", RTE_OUTB_PN_IOPS_PN_IOPS_OFFSET_PDU_POS_X(value));
-        DBG_PR_REG(":CHK_ENA", RTE_OUTB_PN_IOPS_PN_IOPS_CHK_ENA_X(value));
-        DBG_PR_REG(":MISMATCH_SKIP_ENA", RTE_OUTB_PN_IOPS_PN_IOPS_MISMATCH_SKIP_ENA_X(value));
+        DBG_PR_REG_M("VAL", RTE_OUTB_PN_IOPS_PN_IOPS_VAL, value);
+        DBG_PR_REG_M("OFFSET_PDU_POS", RTE_OUTB_PN_IOPS_PN_IOPS_OFFSET_PDU_POS, value);
+        DBG_PR_REG_M("CHK_ENA", RTE_OUTB_PN_IOPS_PN_IOPS_CHK_ENA, value);
+        DBG_PR_REG_M("MISMATCH_SKIP_ENA", RTE_OUTB_PN_IOPS_PN_IOPS_MISMATCH_SKIP_ENA, value);
         DBG_REG(REG_ADDR(RTE_OUTB_OPC_DATA_SET_FLAGS1_VAL(i)), "OPC_FLAGS1_VAL");
         REG_RD(RTE_OUTB_OPC_DATA_SET_FLAGS1_MISC(i), &value);
         DBG_PR_REG("OPC_FLAGS1_MISC", value);
-        DBG_PR_REG(":OFFSET_PDU_POS",
-                   RTE_OUTB_OPC_DATA_SET_FLAGS1_MISC_OPC_DATA_SET_FLAGS1_OFFSET_PDU_POS_X(value));
-        DBG_PR_REG(":MISMATCH_SKIP_ENA",
-                   RTE_OUTB_OPC_DATA_SET_FLAGS1_MISC_OPC_DATA_SET_FLAGS1_MISMATCH_SKIP_ENA_X(value));
-        DBG_PR_REG(":CHK_ENA",
-                   RTE_OUTB_OPC_DATA_SET_FLAGS1_MISC_OPC_DATA_SET_FLAGS1_CHK_ENA_X(value));
+        DBG_PR_REG_M("OFFSET_PDU_POS",
+                     RTE_OUTB_OPC_DATA_SET_FLAGS1_MISC_OPC_DATA_SET_FLAGS1_OFFSET_PDU_POS, value);
+        DBG_PR_REG_M("MISMATCH_SKIP_ENA",
+                     RTE_OUTB_OPC_DATA_SET_FLAGS1_MISC_OPC_DATA_SET_FLAGS1_MISMATCH_SKIP_ENA, value);
+        DBG_PR_REG_M("CHK_ENA",
+                     RTE_OUTB_OPC_DATA_SET_FLAGS1_MISC_OPC_DATA_SET_FLAGS1_CHK_ENA, value);
         DBG_REG(REG_ADDR(RTE_OUTB_OPC_SEQ_NUM(i)), "OPC_SEQ_NUM");
         DBG_REG(REG_ADDR(RTE_OUTB_OPC_STATUS_CODE_VAL(i)), "OPC_STATUS_CODE_VAL");
         REG_RD(RTE_OUTB_OPC_STATUS_CODE_MISC(i), &value);
         DBG_PR_REG("OPC_STATUS_CODE_MISC", value);
-        DBG_PR_REG(":CODE_CHK_ENA",
-                   RTE_OUTB_OPC_STATUS_CODE_MISC_OPC_STATUS_CODE_CHK_ENA_X(value));
-        DBG_PR_REG(":MISMATCH_SKIP_ENA",
-                   RTE_OUTB_OPC_STATUS_CODE_MISC_OPC_STATUS_CODE_MISMATCH_SKIP_ENA_X(value));
-        DBG_PR_REG(":FAIL_SEVERITY_VAL",
-                   RTE_OUTB_OPC_STATUS_CODE_MISC_OPC_FAIL_SEVERITY_VAL_X(value));
+        DBG_PR_REG_M("CODE_CHK_ENA",
+                     RTE_OUTB_OPC_STATUS_CODE_MISC_OPC_STATUS_CODE_CHK_ENA, value);
+        DBG_PR_REG_M("MISMATCH_SKIP_ENA",
+                     RTE_OUTB_OPC_STATUS_CODE_MISC_OPC_STATUS_CODE_MISMATCH_SKIP_ENA, value);
+        DBG_PR_REG_M("FAIL_SEVERITY_VAL",
+                     RTE_OUTB_OPC_STATUS_CODE_MISC_OPC_FAIL_SEVERITY_VAL, value);
         DBG_REG(REG_ADDR(RTE_OUTB_DG_STICKY_BITS(i)), "STICKY_BITS");
         DBG_REG(REG_ADDR(RTE_OUTB_PN_STATUS(i)), "PN_STATUS");
         DBG_REG(REG_ADDR(RTE_OUTB_OPC_STATUS(i)), "OPC_STATUS");
@@ -519,5 +701,47 @@ int mera_ob_debug_print(struct mera_inst *inst,
             MERA_RC(mera_ob_debug_dg_data(inst, pr, i, j));
         }
     }
+
+    for (i = 0; i < MERA_OB_WAL_CNT; i++) {
+        REG_RD(RTE_OUTB_WR_ACTION_ADDR(i), &value);
+        addr = RTE_OUTB_WR_ACTION_ADDR_WR_ACTION_ADDR_X(value);
+        if (addr == 0 && !info->full) {
+            continue;
+        }
+        sprintf(buf, "OUTB_WR_TIMER_TBL_%u", i);
+        mera_debug_print_reg_header(pr, buf);
+        DBG_REG(REG_ADDR(RTE_OUTB_WR_TIMER_CFG1(i)), "FIRST_RUT_CNT");
+        DBG_REG(REG_ADDR(RTE_OUTB_WR_TIMER_CFG2(i)), "DELTA_RUT_CNT");
+        DBG_PR_REG("WR_ACTION_ADDR", value);
+        pr("\n");
+
+        while (addr != 0) {
+            j = addr;
+            sprintf(buf, "OUTB_WR_ACTION_TBL_%u", j);
+            mera_debug_print_reg_header(pr, buf);
+            REG_RD(RTE_WR_ACTION_MISC(j), &value);
+            addr = RTE_WR_ACTION_MISC_WR_ACTION_ADDR_X(value);
+            DBG_PR_REG("WR_ACTION_MISC", value);
+            DBG_PR_REG_M("OUTB_RTP_ID", RTE_WR_ACTION_MISC_OUTB_RTP_ID, value);
+            DBG_PR_REG_M("WR_ACTION_ADDR", RTE_WR_ACTION_MISC_WR_ACTION_ADDR, value);
+            DBG_PR_REG_M("BUF3_WR_MODE", RTE_WR_ACTION_MISC_BUF3_WR_MODE, value);
+            DBG_PR_REG_M("HW_WR_DIS_MODE", RTE_WR_ACTION_MISC_HW_WR_DIS_MODE, value);
+            DBG_PR_REG_M("INTERN_ENA", RTE_WR_ACTION_MISC_INTERN_ENA, value);
+            DBG_PR_REG_M("TRNSFR_PROTECT_ENA", RTE_WR_ACTION_MISC_TRANSFER_PROTECT_ENA, value);
+            REG_RD(RTE_WR_ACTION_DG_DATA(j), &value);
+            DBG_PR_REG("WR_ACTION_DG_DATA", value);
+            DBG_PR_REG_M("SECTION_ADDR", RTE_WR_ACTION_DG_DATA_DG_DATA_SECTION_ADDR, value);
+            DBG_PR_REG_M("DATA_LEN", RTE_WR_ACTION_DG_DATA_DG_DATA_LEN, value);
+            DBG_PR_REG_M("LATEST_INVLD_MODE", RTE_WR_ACTION_DG_DATA_DG_DATA_LATEST_INVLD_MODE, value);
+            DBG_REG(REG_ADDR(RTE_WR_RAI_ADDR(j)), "WR_RAI_ADDR");
+            DBG_REG(REG_ADDR(RTE_RD_RAI_ADDR(j)), "RD_RAI_ADDR");
+            DBG_REG(REG_ADDR(RTE_OFFSET_RAI_ADDR(j)), "OFFSET_RAI_ADDR");
+            DBG_REG(REG_ADDR(RTE_BUF3_ADDR(j)), "BUF3_ADDR");
+            REG_RD(RTE_WR_ACTION_RTP_GRP(j), &value);
+            DBG_PR_REG("RTP_GRP", value);
+            pr("\n");
+        }
+    }
+
     return 0;
 }

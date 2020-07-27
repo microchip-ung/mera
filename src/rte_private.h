@@ -32,6 +32,11 @@ typedef struct {
 #define RTE_RTP_CNT    (MERA_RTP_CNT + 1)
 #define RTE_OB_RTP_CNT RTE_RTP_CNT
 #define RTE_OB_DG_CNT  RTE_RTP_CNT
+#if defined(MERA_FPGA)
+#define RTE_OB_WA_CNT  36
+#else
+#define RTE_OB_WA_CNT  577
+#endif
 #define RTE_IB_RTP_CNT RTE_RTP_CNT
 
 // Size of one DG section in 4-byte chunks
@@ -65,12 +70,27 @@ typedef struct {
     uint16_t                  dg_addr; // Allocated DG address
 } mera_ob_dg_entry_t;
 
+// WAL entry
+typedef struct {
+    mera_ob_wal_conf_t conf;
+    uint16_t           addr; // First WA address
+} mera_ob_wal_entry_t;
+
+// WA entry
+typedef struct {
+    mera_bool_t       used; // Used indication
+    uint16_t          addr; // Next address
+    mera_ob_wa_conf_t conf; // Configuration
+} mera_ob_wa_entry_t;
+
 // RTE OB state
 typedef struct {
     mera_rtp_id_t       rtp_id;
     uint16_t            dg_addr; // Next free DG address
     mera_ob_rtp_entry_t rtp_tbl[RTE_OB_RTP_CNT];
     mera_ob_dg_entry_t  dg_tbl[RTE_OB_DG_CNT];
+    mera_ob_wa_entry_t  wa_tbl[RTE_OB_WA_CNT];
+    mera_ob_wal_entry_t wal_tbl[MERA_OB_WAL_CNT];
 } mera_ob_t;
 
 // RTP IB entry
@@ -99,7 +119,6 @@ struct mera_inst *mera_inst_get(struct mera_inst *inst);
 
 int mera_rtp_check(const mera_rtp_id_t rtp_id);
 void mera_cnt_16_update(uint16_t value, mera_counter_t *counter, int clear);
-
 
 int mera_ib_init(struct mera_inst *inst);
 int mera_ob_init(struct mera_inst *inst);
