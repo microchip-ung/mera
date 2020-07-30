@@ -15,6 +15,18 @@
 #define VTSS_ENCODE_BITFIELD(x,o,w)   (((x) & VTSS_BITMASK(w)) << (o))
 #define VTSS_ENCODE_BITMASK(o,w)      (VTSS_BITMASK(w) << (o))
 
+#if __INTPTR_MAX__ == __INT32_MAX__
+#if !defined(PRIu64)
+#define PRIu64 "llu"
+#endif
+#elif __INTPTR_MAX__ == __INT64_MAX__
+#if !defined(PRIu64)
+#define PRIu64 "lu"
+#endif
+#else
+#error "Environment not 32 or 64-bit."
+#endif
+
 #if 1
 #include "lan9662_regs_sr.h"
 #else
@@ -34,13 +46,20 @@ typedef struct {
 #define RTE_OB_DG_CNT  RTE_RTP_CNT
 #if defined(MERA_FPGA)
 #define RTE_OB_WA_CNT  36
+#define RTE_IB_RA_CNT  36
 #else
 #define RTE_OB_WA_CNT  577
+#define RTE_IB_RA_CNT  577
 #endif
 #define RTE_IB_RTP_CNT RTE_RTP_CNT
+#define RTE_IB_DG_CNT  RTE_RTP_CNT
 
 // Size of one DG section in 4-byte chunks
+#if defined(MERA_FPGA)
 #define RTE_OB_DG_SEC_SIZE 64
+#else
+#define RTE_OB_DG_SEC_SIZE 1024
+#endif
 
 // Number of RTPs to poll every second to avoid multiple wrap arounds of 16-bit counters.
 // Minimum cycle time is 200 usec, giving 5000 pps, or 13 seconds to wrap.
@@ -58,21 +77,21 @@ typedef struct {
 typedef struct {
     mera_ob_rtp_conf_t conf; // Configuration
     uint16_t           addr; // First address
-    mera_counter_t     rx_0;
-    mera_counter_t     rx_1;
+    mera_counter_t     rx_0; // Rx_0 counter
+    mera_counter_t     rx_1; // Rx_1 counter
 } mera_ob_rtp_entry_t;
 
 // DG entry
 typedef struct {
-    mera_ob_rtp_pdu2dg_conf_t conf;    // Configuration
-    mera_rtp_id_t             rtp_id;  // Zero indicates free entry
-    uint16_t                  addr;    // Next address
-    uint16_t                  dg_addr; // Allocated DG address
+    mera_ob_dg_conf_t conf;    // Configuration
+    mera_rtp_id_t     rtp_id;  // Zero indicates free entry
+    uint16_t          addr;    // Next address
+    uint16_t          dg_addr; // Allocated DG address
 } mera_ob_dg_entry_t;
 
 // WAL entry
 typedef struct {
-    mera_ob_wal_conf_t conf;
+    mera_ob_wal_conf_t conf; // Configuration
     uint16_t           addr; // First WA address
 } mera_ob_wal_entry_t;
 
@@ -85,7 +104,7 @@ typedef struct {
 
 // RTE OB state
 typedef struct {
-    mera_rtp_id_t       rtp_id;
+    mera_rtp_id_t       rtp_id;  // Counter polling
     uint16_t            dg_addr; // Next free DG address
     mera_ob_rtp_entry_t rtp_tbl[RTE_OB_RTP_CNT];
     mera_ob_dg_entry_t  dg_tbl[RTE_OB_DG_CNT];
@@ -95,16 +114,41 @@ typedef struct {
 
 // RTP IB entry
 typedef struct {
-    mera_ib_rtp_conf_t conf; // Configuration
-    mera_counter_t     tx_inj;
-    mera_counter_t     tx_otf;
+    mera_ib_rtp_conf_t conf;          // Configuration
+    uint32_t           frm_data_addr; // Allocated frame data address
+    mera_counter_t     tx_inj;        // Tx injection counter
+    mera_counter_t     tx_otf;        // Tx on the fly counter
 } mera_ib_rtp_entry_t;
+
+// RAL entry
+typedef struct {
+    mera_ib_ral_conf_t conf; // Configuration
+    uint16_t           addr; // First RA address
+} mera_ib_ral_entry_t;
+
+// RA entry
+typedef struct {
+    mera_bool_t       used;    // Used indication
+    uint16_t          addr;    // Next RA address
+    uint16_t          dg_addr; // First DG address
+    uint16_t          dg_cnt;  // Number of DG entries
+    mera_ib_ra_conf_t conf;    // Configuration
+} mera_ib_ra_entry_t;
+
+// DG entry
+typedef struct {
+    mera_ib_dg_conf_t conf; // Configuration
+    uint16_t          addr; // Next DG address
+} mera_ib_dg_entry_t;
 
 // RTE IB state
 typedef struct {
-    mera_rtp_id_t       rtp_id;
-    uint32_t            frm_data_addr;
+    mera_rtp_id_t       rtp_id;        // Counter polling
+    uint32_t            frm_data_addr; // Next free frame data address
     mera_ib_rtp_entry_t rtp_tbl[RTE_IB_RTP_CNT];
+    mera_ib_ra_entry_t  ra_tbl[RTE_IB_RA_CNT];
+    mera_ib_ral_entry_t ral_tbl[MERA_IB_RAL_CNT];
+    mera_ib_dg_entry_t  dg_tbl[RTE_IB_DG_CNT];
 } mera_ib_t;
 
 // RTE state

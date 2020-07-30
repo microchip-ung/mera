@@ -100,15 +100,15 @@ int mera_ob_rtp_conf_set(struct mera_inst         *inst,
     return 0;
 }
 
-int mera_ob_rtp_pdu2dg_init(mera_ob_rtp_pdu2dg_conf_t *const conf)
+int mera_ob_dg_init(mera_ob_dg_conf_t *const conf)
 {
     memset(conf, 0, sizeof(*conf));
     return 0;
 }
 
-int mera_ob_rtp_pdu2dg_add(struct mera_inst                *inst,
-                           const mera_rtp_id_t             rtp_id,
-                           const mera_ob_rtp_pdu2dg_conf_t *conf)
+int mera_ob_dg_add(struct mera_inst        *inst,
+                   const mera_rtp_id_t     rtp_id,
+                   const mera_ob_dg_conf_t *conf)
 {
     mera_ob_t           *ob;
     mera_ob_dg_entry_t  *dg, *prev;
@@ -147,9 +147,9 @@ int mera_ob_rtp_pdu2dg_add(struct mera_inst                *inst,
     rtp = &ob->rtp_tbl[rtp_id];
     for (addr = rtp->addr, prev = NULL; addr != 0; ) {
         dg = &ob->dg_tbl[addr];
-        if (dg->conf.id == conf->id) {
+        if (dg->conf.dg_id == conf->dg_id) {
             // Same ID found
-            T_E("rtp_id %u already has id %u", rtp_id, conf->id);
+            T_E("rtp_id %u already has id %u", rtp_id, conf->dg_id);
             return -1;
         } else if (dg->conf.pdu_offset == conf->pdu_offset) {
             // Same PDU offset found
@@ -277,7 +277,7 @@ int mera_ob_wa_add(struct mera_inst        *inst,
         addr = ob->rtp_tbl[conf->rtp_id].addr;
         while (addr != 0) {
             dg = &ob->dg_tbl[addr];
-            if (dg->conf.id == conf->dg_id) {
+            if (dg->conf.dg_id == conf->dg_id) {
                 found = 1;
                 break;
             }
@@ -395,10 +395,10 @@ static int mera_ob_rtp_counters_update(struct mera_inst       *inst,
         REG_RD(RTE_OUTB_PDU_RECV_CNT(rtp_id), &value);
         mera_cnt_16_update(RTE_OUTB_PDU_RECV_CNT_PDU_RECV_CNT0_X(value), &rtp->rx_0, clear);
         mera_cnt_16_update(RTE_OUTB_PDU_RECV_CNT_PDU_RECV_CNT1_X(value), &rtp->rx_1, clear);
-        if (counters != NULL) {
-            counters->rx_0 = rtp->rx_0.value;
-            counters->rx_1 = rtp->rx_1.value;
-        }
+    }
+    if (counters != NULL) {
+        counters->rx_0 = rtp->rx_0.value;
+        counters->rx_1 = rtp->rx_1.value;
     }
     return 0;
 }
@@ -465,15 +465,16 @@ int mera_ob_debug_print(struct mera_inst *inst,
                         const mera_debug_printf_t pr,
                         const mera_debug_info_t   *const info)
 {
-    mera_ob_t           *ob = &inst->ob;
-    mera_ob_rtp_entry_t *rtp;
-    mera_ob_dg_entry_t  *dg;
-    mera_ob_wal_entry_t *wal;
-    mera_ob_wa_entry_t  *wa;
-    const char          *txt;
-    uint32_t            value, len, pos, idx, i, j, addr = ob->dg_addr;
-    mera_bool_t         internal;
-    char                buf[32];
+    mera_ob_t              *ob = &inst->ob;
+    mera_ob_rtp_entry_t    *rtp;
+    mera_ob_rtp_counters_t cnt;
+    mera_ob_dg_entry_t     *dg;
+    mera_ob_wal_entry_t    *wal;
+    mera_ob_wa_entry_t     *wa;
+    const char             *txt;
+    uint32_t               value, len, pos, idx, i, j, addr = ob->dg_addr;
+    mera_bool_t            internal;
+    char                   buf[32];
     struct {
         uint32_t cnt;
         uint32_t addr[3];
@@ -509,14 +510,17 @@ int mera_ob_debug_print(struct mera_inst *inst,
             pr("-");
         }
         pr("\n");
-        while (addr != 0) {
+        if (mera_ob_rtp_counters_update(inst, i, &cnt, 0) == 0) {
+            pr("Rx 0  : %" PRIu64 "\n", cnt.rx_0);
+            pr("Rx 1  : %" PRIu64 "\n", cnt.rx_1);
+        }
+        for ( ; addr != 0; addr = dg->addr) {
             dg = &ob->dg_tbl[addr];
             if (addr == rtp->addr) {
-                pr("\n  ID    Addr  PDU   DG_Addr  Length\n");
+                pr("\n  Addr  DG ID  PDU   DG_Addr  Length\n");
             }
-            pr("  %-6u%-6u%-6u%-9u%u\n",
-               dg->conf.id, addr, dg->conf.pdu_offset, dg->dg_addr, dg->conf.length);
-            addr = dg->addr;
+            pr("  %-6u%-7u%-6u%-9u%u\n",
+               addr, dg->conf.dg_id, dg->conf.pdu_offset, dg->dg_addr, dg->conf.length);
         }
         pr("\n");
     }
@@ -529,7 +533,7 @@ int mera_ob_debug_print(struct mera_inst *inst,
         }
         pr("WAL ID: %u\n", i);
         pr("Time  : %u.%03u usec\n", wal->conf.time / 1000, wal->conf.time % 1000);
-        while (addr != 0) {
+        for ( ; addr != 0; addr = wa->addr) {
             wa = &ob->wa_tbl[addr];
             if (addr == wal->addr) {
                 pr("\n  Addr  RTP  DG   RD Addr     Length  WR Addr\n");
@@ -545,7 +549,6 @@ int mera_ob_debug_print(struct mera_inst *inst,
             sprintf(buf, "%u", wa->conf.length);
             pr("%-8s", internal ? buf : "-");
             pr("0x%08x\n", wa->conf.wr_addr);
-            addr = wa->addr;
         }
         pr("\n");
     }
@@ -573,6 +576,7 @@ int mera_ob_debug_print(struct mera_inst *inst,
     DBG_PR_REG_M("GRP_VER_CHK_ENA", RTE_OUTB_OPC_PDU_MISC_OPC_GRP_VER_CHK_ENA, value);
     DBG_PR_REG_M("NMSG_NUM", RTE_OUTB_OPC_PDU_MISC_OPC_NETWORK_MSG_NUM, value);
     DBG_REG(REG_ADDR(RTE_OUTB_STICKY_BITS), "STICKY_BITS");
+    DBG_REG(REG_ADDR(RTE_OUTB_BUS_ERROR), "BUS_ERROR");
     pr("\n");
 
     for (i = 1; i < RTE_OB_RTP_CNT; i++) {

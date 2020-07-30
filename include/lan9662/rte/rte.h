@@ -69,6 +69,12 @@ typedef uint16_t mera_rtp_id_t;
 // Outbound Write Action List ID (0-based)
 typedef uint16_t mera_ob_wal_id_t;
 
+// Number of Inbound Read Action List IDs (0-based)
+#define MERA_IB_RAL_CNT MERA_RTP_CNT
+
+// Inbound Read Action List ID (0-based)
+typedef uint16_t mera_ib_ral_id_t;
+
 // RTP entry type
 typedef enum {
     MERA_RTP_TYPE_DISABLED, // Disabled
@@ -98,23 +104,23 @@ int mera_ob_rtp_conf_set(struct mera_inst         *inst,
                          const mera_rtp_id_t      rtp_id,
                          const mera_ob_rtp_conf_t *const conf);
 
-// Outbound data group ID, must be unique for RTP
+// Outbound Data Group ID, must be unique for RTP
 typedef uint16_t mera_ob_dg_id_t;
 
-// RTP PDU-to-DG configuration
+// Outbound Data Group configuration
 typedef struct {
-    mera_ob_dg_id_t id;         // Data group ID
+    mera_ob_dg_id_t dg_id;      // Data group ID
     uint16_t        pdu_offset; // PDU offset after Ethernet Type
     uint16_t        length;     // Data length
-} mera_ob_rtp_pdu2dg_conf_t;
+} mera_ob_dg_conf_t;
 
-// Initalize PDU-to-DG configuration
-int mera_ob_rtp_pdu2dg_init(mera_ob_rtp_pdu2dg_conf_t *const conf);
+// Initalize Outbound DG configuration
+int mera_ob_dg_init(mera_ob_dg_conf_t *const conf);
 
-// Add PDU-to-DG configuration
-int mera_ob_rtp_pdu2dg_add(struct mera_inst                *inst,
-                           const mera_rtp_id_t             rtp_id,
-                           const mera_ob_rtp_pdu2dg_conf_t *const conf);
+// Add Outbound DG configuration
+int mera_ob_dg_add(struct mera_inst        *inst,
+                   const mera_rtp_id_t     rtp_id,
+                   const mera_ob_dg_conf_t *const conf);
 
 // Outbound Write Action List configuration
 typedef struct {
@@ -199,6 +205,54 @@ int mera_ib_rtp_conf_get(struct mera_inst    *inst,
 int mera_ib_rtp_conf_set(struct mera_inst         *inst,
                          const mera_rtp_id_t      rtp_id,
                          const mera_ib_rtp_conf_t *const conf);
+
+// Inbound Read Action List configuration
+typedef struct {
+    uint32_t time; // Time [nsec]
+} mera_ib_ral_conf_t;
+
+// Get Inbound Read Action List configuration
+int mera_ib_ral_conf_get(struct mera_inst       *inst,
+                         const mera_ib_ral_id_t ral_id,
+                         mera_ib_ral_conf_t     *const conf);
+
+// Set Inbound Read Action List configuration
+int mera_ib_ral_conf_set(struct mera_inst         *inst,
+                         const mera_ib_ral_id_t   ral_id,
+                         const mera_ib_ral_conf_t *const conf);
+
+// Intbound Read Action ID, must be unique for RAL
+typedef uint16_t mera_ib_ra_id_t;
+
+// Inbound Read Action configuration
+typedef struct {
+    mera_ib_ra_id_t ra_id;   // Read Action ID
+    uint32_t        rd_addr; // Read address
+    uint16_t        length;  // Data length
+} mera_ib_ra_conf_t;
+
+// Initialize Read Action configuration
+int mera_ib_ra_init(mera_ib_ra_conf_t *const conf);
+
+// Add Read Action configuration
+int mera_ib_ra_add(struct mera_inst        *inst,
+                   const mera_ib_ral_id_t  ral_id,
+                   const mera_ib_ra_conf_t *const conf);
+
+// Inbound Data Group configuration
+typedef struct {
+    mera_rtp_id_t rtp_id;     // Inbound RTP
+    uint16_t      pdu_offset; // PDU offset after Ethernet Type
+} mera_ib_dg_conf_t;
+
+// Initalize Inbound DG configuration
+int mera_ib_dg_init(mera_ib_dg_conf_t *const conf);
+
+// Add Inbound DG configuration
+int mera_ib_dg_add(struct mera_inst        *inst,
+                   const mera_ib_ral_id_t  ral_id,
+                   const mera_ib_ra_id_t   ra_id,
+                   const mera_ib_dg_conf_t *const conf);
 
 // Flush all inbound configuration
 int mera_ib_flush(struct mera_inst *inst);
