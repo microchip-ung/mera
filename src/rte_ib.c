@@ -173,6 +173,7 @@ int mera_ib_ra_add(struct mera_inst        *inst,
                    const mera_ib_ral_id_t  ral_id,
                    const mera_ib_ra_conf_t *const conf)
 {
+    mera_gen_t          *gen;
     mera_ib_t           *ib;
     mera_ib_ral_entry_t *ral;
     mera_ib_ra_entry_t  *ra;
@@ -180,6 +181,7 @@ int mera_ib_ra_add(struct mera_inst        *inst,
 
     MERA_RC(mera_ral_check(ral_id));
     inst = mera_inst_get(inst);
+    gen = &inst->gen;
     ib = &inst->ib;
     ral = &ib->ral_tbl[ral_id];
 
@@ -202,7 +204,12 @@ int mera_ib_ra_add(struct mera_inst        *inst,
     }
 
     // Update RA entry
-    REG_WR(RTE_INB_BASE_RAI_ADDR(addr), conf->rd_addr);
+    REG_WR(RTE_INB_BASE_RAI_ADDR(addr), gen->rai_base + conf->rd_addr);
+    REG_WR(RTE_INB_OFFSET_RAI_ADDR(addr), gen->rai_offset);
+    // Read mode is NONE(0)/REQ_REL(3)/REQ(1)
+    REG_WR(RTE_INB_RD_ACTION_BUF3(addr),
+           RTE_INB_RD_ACTION_BUF3_BUF3_ADDR(addr) |
+           RTE_INB_RD_ACTION_BUF3_BUF3_RD_MODE(gen->rai_offset == 0 ? 0 : ra->addr == 0 ? 3 : 1));
     REG_WR(RTE_INB_RD_ACTION_MISC(addr),
            RTE_INB_RD_ACTION_MISC_DG_DATA_LEN(conf->length) |
            RTE_INB_RD_ACTION_MISC_RD_MAGIC_ENA(0) |
@@ -213,8 +220,17 @@ int mera_ib_ra_add(struct mera_inst        *inst,
            RTE_INB_RD_ACTION_ADDRS_FRM_DATA_CP_ADDR(0) |
            RTE_INB_RD_ACTION_ADDRS_RD_ACTION_ADDR(ra->addr));
 
+    addr = ra->addr;
+    if (gen->rai_offset != 0 && addr != 0) {
+        // Read mode for next entry is NONE(0)/REL(2)
+        ra = &ib->ra_tbl[addr];
+        REG_WRM(RTE_INB_RD_ACTION_BUF3(addr),
+                RTE_INB_RD_ACTION_BUF3_BUF3_RD_MODE(ra->addr == 0 ? 2 : 0),
+                RTE_INB_RD_ACTION_BUF3_BUF3_RD_MODE_M);
+    }
+
     // Update RAL
-    REG_WR(RTE_INB_RD_ACTION_ADDR(ral_id), RTE_INB_RD_ACTION_ADDR_RD_ACTION_ADDR(addr));
+    REG_WR(RTE_INB_RD_ACTION_ADDR(ral_id), RTE_INB_RD_ACTION_ADDR_RD_ACTION_ADDR(ral->addr));
 
     return 0;
 }
@@ -568,7 +584,12 @@ int mera_ib_debug_print(struct mera_inst *inst,
             DBG_PR_REG_M("STATE_STICKY", RTE_INB_RD_ACTION_MISC_STATE_STICKY_ENA, value);
             DBG_PR_REG_M("INTERN_ENA", RTE_INB_RD_ACTION_MISC_INTERN_ENA, value);
             DBG_PR_REG_M("RD_CNT", RTE_INB_RD_ACTION_MISC_RD_CNT, value);
+            REG_RD(RTE_INB_RD_ACTION_BUF3(j), &value);
+            DBG_PR_REG("RD_ACTION_BUF3", value);
+            DBG_PR_REG_M("BUF3_ADDR", RTE_INB_RD_ACTION_BUF3_BUF3_ADDR, value);
+            DBG_PR_REG_M("BUF3_RD_MODE", RTE_INB_RD_ACTION_BUF3_BUF3_RD_MODE, value);
             DBG_REG(REG_ADDR(RTE_INB_BASE_RAI_ADDR(j)), "BASE_RAI_ADDR");
+            DBG_REG(REG_ADDR(RTE_INB_OFFSET_RAI_ADDR(j)), "OFFSET_RAI_ADDR");
             DBG_REG(REG_ADDR(RTE_INB_RD_ACTION_STICKY_BITS(j)), "STICKY_BITS");
             pr("\n");
 

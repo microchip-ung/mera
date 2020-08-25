@@ -38,6 +38,8 @@
 // RTE general state
 typedef struct {
     mera_gen_conf_t conf;
+    uint32_t        rai_base;
+    uint32_t        rai_offset;
 } mera_gen_t;
 
 // One more entry for direct 1-based indexing

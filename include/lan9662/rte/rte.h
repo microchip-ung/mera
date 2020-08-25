@@ -31,9 +31,18 @@ void mera_destroy(struct mera_inst *inst);
 
 /* - RTE general --------------------------------------------------- */
 
+// RTE I/O interface
+typedef enum {
+    MERA_IO_INTF_QSPI,  // QSPI
+    MERA_IO_INTF_PI,    // PI
+    MERA_IO_INTF_SRAM,  // SRAM
+    MERA_IO_INTF_PCIE,  // PCIe
+} mera_io_intf_t;
+
 // RTE general configuration
 typedef struct {
-    mera_bool_t enable; // Enable/disable RTE
+    mera_bool_t    enable; // Enable/disable RTE
+    mera_io_intf_t intf;   // I/O interface
 } mera_gen_conf_t;
 
 // Get RTE general configuration.
