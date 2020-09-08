@@ -170,7 +170,7 @@ int mera_gen_conf_set(struct mera_inst      *inst,
     case MERA_IO_INTF_SRAM:
         // Use 128/3 = 42 kB for 3-buffer system
         gen->rai_base = 0x00100000;
-        gen->rai_offset = (42 * 1024);
+        gen->rai_offset = RTE_BUF3_SIZE;
         break;
     case MERA_IO_INTF_PCIE:
         gen->rai_base = 0x10000000;

@@ -91,6 +91,11 @@ typedef enum {
     MERA_RTP_TYPE_OPC_UA,   // OPC-UA
 } mera_rtp_type_t;
 
+// Triple buffer information
+typedef struct {
+    uint32_t addr; // Base address of requested buffer
+} mera_buf_t;
+
 /* - RTE Outbound -------------------------------------------------- */
 
 // RTP Outbound configuration
@@ -145,6 +150,15 @@ int mera_ob_wal_conf_get(struct mera_inst       *inst,
 int mera_ob_wal_conf_set(struct mera_inst         *inst,
                          const mera_ob_wal_id_t   wal_id,
                          const mera_ob_wal_conf_t *const conf);
+
+// Request Outbound Write Action List read buffer
+int mera_ob_wal_req(struct mera_inst       *inst,
+                    const mera_ob_wal_id_t wal_id,
+                    mera_buf_t             *const buf);
+
+// Release Outbound Write Action List read buffer
+int mera_ob_wal_rel(struct mera_inst       *inst,
+                    const mera_ob_wal_id_t wal_id);
 
 // Outbound Write Action configuration
 typedef struct {
@@ -229,6 +243,15 @@ int mera_ib_ral_conf_get(struct mera_inst       *inst,
 int mera_ib_ral_conf_set(struct mera_inst         *inst,
                          const mera_ib_ral_id_t   ral_id,
                          const mera_ib_ral_conf_t *const conf);
+
+// Request Inbound Read Action List write buffer
+int mera_ib_ral_req(struct mera_inst       *inst,
+                    const mera_ib_ral_id_t ral_id,
+                    mera_buf_t             *const buf);
+
+// Release Inbound Read Action List write buffer
+int mera_ib_ral_rel(struct mera_inst       *inst,
+                    const mera_ib_ral_id_t ral_id);
 
 // Intbound Read Action ID, must be unique for RAL
 typedef uint16_t mera_ib_ra_id_t;

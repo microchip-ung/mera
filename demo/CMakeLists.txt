@@ -28,6 +28,7 @@ add_library(mera-demo-lib STATIC cli.c trace.c uio.c json_rpc.c ${CMAKE_CURRENT_
 
 add_executable(mera-demo main.c)
 add_executable(mera-cmd cmd.c)
+add_executable(mera-sram-rw sram.c)
 
 target_link_libraries(mera-demo mera-demo-lib mera rte-json-c)
 

@@ -163,6 +163,35 @@ int mera_ib_ral_conf_set(struct mera_inst         *inst,
     return 0;
 }
 
+int mera_ib_ral_req(struct mera_inst       *inst,
+                    const mera_ib_ral_id_t ral_id,
+                    mera_buf_t             *const buf)
+{
+    uint32_t value;
+
+    MERA_RC(mera_ral_check(ral_id));
+    inst = mera_inst_get(inst);
+    REG_RD(RTE_INB_BUF3_WR_REQ(ral_id), &value);
+    value = RTE_INB_BUF3_WR_REQ_WR_IDX_X(value);
+    if (value > 2) {
+        T_E("invalid WR_IDX for ral_id %u", ral_id);
+        return -1;
+    }
+    buf->addr = (value * RTE_BUF3_SIZE);
+    return 0;
+}
+
+int mera_ib_ral_rel(struct mera_inst       *inst,
+                    const mera_ib_ral_id_t ral_id)
+{
+    uint32_t value;
+
+    MERA_RC(mera_ral_check(ral_id));
+    inst = mera_inst_get(inst);
+    REG_RD(RTE_INB_BUF3_WR_REL(ral_id), &value);
+    return 0;
+}
+
 int mera_ib_ra_init(mera_ib_ra_conf_t *const conf)
 {
     memset(conf, 0, sizeof(*conf));
@@ -184,6 +213,15 @@ int mera_ib_ra_add(struct mera_inst        *inst,
     gen = &inst->gen;
     ib = &inst->ib;
     ral = &ib->ral_tbl[ral_id];
+
+    // Check if entry already exists
+    for (addr = ral->addr; addr != 0; addr = ra->addr) {
+        ra = &ib->ra_tbl[addr];
+        if (ra->conf.ra_id == conf->ra_id) {
+            T_E("ral_id %u already has ra_id %u", ral_id, conf->ra_id);
+            return -1;
+        }
+    }
 
     // Find free RA entry
     for (addr = 1, found = 0; addr < RTE_IB_RA_CNT; addr++) {
@@ -208,7 +246,7 @@ int mera_ib_ra_add(struct mera_inst        *inst,
     REG_WR(RTE_INB_OFFSET_RAI_ADDR(addr), gen->rai_offset);
     // Read mode is NONE(0)/REQ_REL(3)/REQ(1)
     REG_WR(RTE_INB_RD_ACTION_BUF3(addr),
-           RTE_INB_RD_ACTION_BUF3_BUF3_ADDR(addr) |
+           RTE_INB_RD_ACTION_BUF3_BUF3_ADDR(ral_id) |
            RTE_INB_RD_ACTION_BUF3_BUF3_RD_MODE(gen->rai_offset == 0 ? 0 : ra->addr == 0 ? 3 : 1));
     REG_WR(RTE_INB_RD_ACTION_MISC(addr),
            RTE_INB_RD_ACTION_MISC_DG_DATA_LEN(conf->length) |
@@ -473,9 +511,7 @@ int mera_ib_debug_print(struct mera_inst *inst,
         pr("Time  : %u.%03u usec\n", ral->conf.time / 1000, ral->conf.time % 1000);
         for ( ; addr != 0; addr = ra->addr) {
             ra = &ib->ra_tbl[addr];
-            if (addr == ral->addr) {
-                pr("\n  Addr  RA ID  RD Addr     Length  DG_CNT\n");
-            }
+            pr("\n  Addr  RA ID  RD Addr     Length  DG_CNT\n");
             pr("  %-6u%-7u0x%08x  %-8u%u\n", addr, ra->conf.ra_id, ra->conf.rd_addr, ra->conf.length, ra->dg_cnt);
             for (addr = ra->dg_addr; addr != 0; addr = dg->addr) {
                 dg = &ib->dg_tbl[addr];
@@ -566,6 +602,14 @@ int mera_ib_debug_print(struct mera_inst *inst,
         DBG_REG(REG_ADDR(RTE_INB_RD_TIMER_CFG1(i)), "FIRST_RUT_CNT");
         DBG_REG(REG_ADDR(RTE_INB_RD_TIMER_CFG2(i)), "DELTA_RUT_CNT");
         DBG_PR_REG("RD_ACTION_ADDR", value);
+        REG_WR(RTE_INB_BUF3_MISC, RTE_INB_BUF3_MISC_BUF3_ADDR(i));
+        REG_RD(RTE_INB_BUF3, &value);
+        DBG_PR_REG("INB_BUF3", value);
+        DBG_PR_REG_M("RD_IDX", RTE_INB_BUF3_RD_IDX, value);
+        DBG_PR_REG_M("WR_IDX", RTE_INB_BUF3_WR_IDX, value);
+        DBG_PR_REG_M("AV_IDX", RTE_INB_BUF3_AV_IDX, value);
+        DBG_PR_REG_M("AV_NEW", RTE_INB_BUF3_AV_NEW, value);
+        DBG_PR_REG_M("TOO_SLOW_CNT", RTE_INB_BUF3_TOO_SLOW_CNT, value);
         pr("\n");
 
         while (addr != 0) {

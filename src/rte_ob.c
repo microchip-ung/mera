@@ -329,7 +329,7 @@ int mera_ob_wa_add(struct mera_inst        *inst,
            RTE_WR_ACTION_RTP_GRP_RTP_GRP_STOPPED_MODE(0));
     REG_WR(RTE_RD_RAI_ADDR(addr), dg ? 0 : (gen->rai_base + conf->rd_addr));
     REG_WR(RTE_OFFSET_RAI_ADDR(addr), RTE_OFFSET_RAI_ADDR_OFFSET_RAI_ADDR(gen->rai_offset));
-    REG_WR(RTE_BUF3_ADDR(addr), RTE_BUF3_ADDR_BUF3_ADDR(addr));
+    REG_WR(RTE_BUF3_ADDR(addr), RTE_BUF3_ADDR_BUF3_ADDR(wal_id));
 
     addr = wa->addr;
     if (gen->rai_offset != 0 && addr != 0) {
@@ -352,6 +352,35 @@ int mera_ob_wa_add(struct mera_inst        *inst,
                     RTE_OUTB_RTP_MISC_WR_ACTION_ADDR_M);
         }
     }
+    return 0;
+}
+
+int mera_ob_wal_req(struct mera_inst       *inst,
+                    const mera_ob_wal_id_t wal_id,
+                    mera_buf_t             *const buf)
+{
+    uint32_t value;
+
+    MERA_RC(mera_wal_check(wal_id));
+    inst = mera_inst_get(inst);
+    REG_RD(RTE_OUTB_BUF3_RD_REQ(wal_id), &value);
+    value = RTE_OUTB_BUF3_RD_REQ_RD_IDX_X(value);
+    if (value > 2) {
+        T_E("invalid RD_IDX for wal_id %u", wal_id);
+        return -1;
+    }
+    buf->addr = (value * RTE_BUF3_SIZE);
+    return 0;
+}
+
+int mera_ob_wal_rel(struct mera_inst       *inst,
+                    const mera_ob_wal_id_t wal_id)
+{
+    uint32_t value;
+
+    MERA_RC(mera_wal_check(wal_id));
+    inst = mera_inst_get(inst);
+    REG_RD(RTE_OUTB_BUF3_RD_REL(wal_id), &value);
     return 0;
 }
 
@@ -729,6 +758,14 @@ int mera_ob_debug_print(struct mera_inst *inst,
         DBG_REG(REG_ADDR(RTE_OUTB_WR_TIMER_CFG1(i)), "FIRST_RUT_CNT");
         DBG_REG(REG_ADDR(RTE_OUTB_WR_TIMER_CFG2(i)), "DELTA_RUT_CNT");
         DBG_PR_REG("WR_ACTION_ADDR", value);
+        REG_WR(RTE_OUTB_BUF3_MISC, RTE_OUTB_BUF3_MISC_BUF3_ADDR(i));
+        REG_RD(RTE_OUTB_BUF3, &value);
+        DBG_PR_REG("OUTB_BUF3", value);
+        DBG_PR_REG_M("RD_IDX", RTE_OUTB_BUF3_RD_IDX, value);
+        DBG_PR_REG_M("WR_IDX", RTE_OUTB_BUF3_WR_IDX, value);
+        DBG_PR_REG_M("AV_IDX", RTE_OUTB_BUF3_AV_IDX, value);
+        DBG_PR_REG_M("AV_NEW", RTE_OUTB_BUF3_AV_NEW, value);
+        DBG_PR_REG_M("TOO_SLOW_CNT", RTE_OUTB_BUF3_TOO_SLOW_CNT, value);
         pr("\n");
 
         while (addr != 0) {
@@ -752,9 +789,9 @@ int mera_ob_debug_print(struct mera_inst *inst,
             DBG_REG(REG_ADDR(RTE_WR_RAI_ADDR(j)), "WR_RAI_ADDR");
             DBG_REG(REG_ADDR(RTE_RD_RAI_ADDR(j)), "RD_RAI_ADDR");
             DBG_REG(REG_ADDR(RTE_OFFSET_RAI_ADDR(j)), "OFFSET_RAI_ADDR");
-            DBG_REG(REG_ADDR(RTE_BUF3_ADDR(j)), "BUF3_ADDR");
             REG_RD(RTE_WR_ACTION_RTP_GRP(j), &value);
             DBG_PR_REG("RTP_GRP", value);
+            DBG_REG(REG_ADDR(RTE_BUF3_ADDR(j)), "BUF3_ADDR");
             pr("\n");
         }
     }

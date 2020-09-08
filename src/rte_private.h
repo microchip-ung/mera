@@ -70,6 +70,9 @@ typedef struct {
 // Convert time in nsec to RUT (50 nsec)
 #define MERA_RUT_TIME(t_nsec) ((t_nsec) / 50)
 
+// Block size of triple buffer system
+#define RTE_BUF3_SIZE (42 * 1024)
+
 typedef struct {
     uint16_t prev;  // Previous value
     uint64_t value; // Accumulated value (64 bits)
