@@ -155,35 +155,52 @@ int mera_gen_conf_get(struct mera_inst *inst,
 int mera_gen_conf_set(struct mera_inst      *inst,
                       const mera_gen_conf_t *const conf)
 {
-    mera_gen_t *gen;
-
     T_I("enter");
     inst = mera_inst_get(inst);
-    gen = &inst->gen;
-    switch (conf->intf) {
-    case MERA_IO_INTF_QSPI:
-        gen->rai_base = 0x40000000;
-        break;
-    case MERA_IO_INTF_PI:
-        gen->rai_base = 0x48000000;
-        break;
-    case MERA_IO_INTF_SRAM:
-        // Use 128/3 = 42 kB for 3-buffer system
-        gen->rai_base = 0x00100000;
-        gen->rai_offset = RTE_BUF3_SIZE;
-        break;
-    case MERA_IO_INTF_PCIE:
-        gen->rai_base = 0x10000000;
-        break;
-    default:
-        T_E("unknown I/O");
-        return -1;
-    }
-    gen->conf = *conf;
+    inst->gen.conf = *conf;
     REG_WR(RTE_RTE_CFG, RTE_RTE_CFG_RTE_ENA(conf->enable ? 1 : 0));
     REG_WR(RTE_SC_LEN, RTE_SC_LEN_SC_LEN(20000000)); // 20.000.000 x 50 nsec = 1 sec
     REG_WR(RTE_SC_RESET, RTE_SC_RESET_SC_RESET_TIME_NS(1));
     return 0;
+}
+
+uint32_t mera_addr_get(const mera_addr_t *addr)
+{
+    uint32_t base = 0;
+
+    switch (addr->intf) {
+    case MERA_IO_INTF_QSPI:
+        base = 0x40000000;
+        break;
+    case MERA_IO_INTF_PI:
+        base = 0x48000000;
+        break;
+    case MERA_IO_INTF_SRAM:
+        base = 0x00100000;
+        break;
+    case MERA_IO_INTF_PCIE:
+        base = 0x10000000;
+        break;
+    default:
+        T_E("unknown I/O");
+        break;
+    }
+    return (addr->addr + base);
+}
+
+uint32_t mera_addr_offset(const mera_addr_t *addr)
+{
+    return (addr->intf == MERA_IO_INTF_SRAM ? RTE_BUF3_SIZE : 0);
+}
+
+char *mera_addr_txt(char *buf, mera_addr_t *addr)
+{
+    sprintf(buf, "0x%08x (%s)", addr->addr,
+            addr->intf == MERA_IO_INTF_QSPI ? "QSPI" :
+            addr->intf == MERA_IO_INTF_PI ? " PI " :
+            addr->intf == MERA_IO_INTF_SRAM ? "SRAM" :
+            addr->intf == MERA_IO_INTF_PCIE ? "PCIe" : "????");
+    return buf;
 }
 
 int mera_poll(struct mera_inst *inst)
@@ -285,13 +302,6 @@ static int mera_gen_debug_print(struct mera_inst *inst,
 
     mera_debug_print_header(pr, "RTE General State");
     pr("RTE State : %s\n", conf->enable ? "Enabled" : "Disabled");
-    pr("RTE I/O   : %s\n",
-       conf->intf == MERA_IO_INTF_QSPI ? "QSPI" :
-       conf->intf == MERA_IO_INTF_PI ? "PI" :
-       conf->intf == MERA_IO_INTF_SRAM ? "SRAM" :
-       conf->intf == MERA_IO_INTF_PCIE ? "PCIe" : "?");
-    pr("RAI Base  : 0x%08x\n", gen->rai_base);
-    pr("RAI Offset: 0x%08x\n", gen->rai_offset);
     pr("\n");
 
     mera_debug_print_header(pr, "RTE General Registers");

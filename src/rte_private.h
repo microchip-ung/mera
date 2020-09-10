@@ -38,8 +38,6 @@
 // RTE general state
 typedef struct {
     mera_gen_conf_t conf;
-    uint32_t        rai_base;
-    uint32_t        rai_offset;
 } mera_gen_t;
 
 // One more entry for direct 1-based indexing
@@ -173,6 +171,9 @@ int mera_ib_init(struct mera_inst *inst);
 int mera_ob_init(struct mera_inst *inst);
 int mera_ib_poll(struct mera_inst *inst);
 int mera_ob_poll(struct mera_inst *inst);
+uint32_t mera_addr_get(const mera_addr_t *addr);
+uint32_t mera_addr_offset(const mera_addr_t *addr);
+char *mera_addr_txt(char *buf, mera_addr_t *addr);
 
 /* ================================================================= *
  *  Register access

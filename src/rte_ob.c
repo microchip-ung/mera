@@ -257,7 +257,6 @@ int mera_ob_wa_add(struct mera_inst        *inst,
                    const mera_ob_wal_id_t  wal_id,
                    const mera_ob_wa_conf_t *const conf)
 {
-    mera_gen_t          *gen;
     mera_ob_t           *ob;
     mera_ob_wal_entry_t *wal;
     mera_ob_wa_entry_t  *wa;
@@ -267,7 +266,6 @@ int mera_ob_wa_add(struct mera_inst        *inst,
 
     MERA_RC(mera_wal_check(wal_id));
     inst = mera_inst_get(inst);
-    gen = &inst->gen;
     ob = &inst->ob;
     wal = &ob->wal_tbl[wal_id];
 
@@ -314,25 +312,25 @@ int mera_ob_wa_add(struct mera_inst        *inst,
            RTE_WR_ACTION_DG_DATA_DG_DATA_SECTION_ADDR(dg ? dg->dg_addr : 0) |
            RTE_WR_ACTION_DG_DATA_DG_DATA_LEN(dg ? dg->conf.length : conf->length) |
            RTE_WR_ACTION_DG_DATA_DG_DATA_LATEST_INVLD_MODE(0));
-    // Write mode is NONE(0)/REQ_REL(3)/REQ(1)
+    // Write mode is REQ_REL(3)/REQ(1)
     REG_WR(RTE_WR_ACTION_MISC(addr),
            RTE_WR_ACTION_MISC_OUTB_RTP_ID(dg ? conf->rtp_id : 0) |
            RTE_WR_ACTION_MISC_WR_ACTION_ADDR(wa->addr) |
-           RTE_WR_ACTION_MISC_BUF3_WR_MODE(gen->rai_offset == 0 ? 0 : wa->addr == 0 ? 3 : 1) |
+           RTE_WR_ACTION_MISC_BUF3_WR_MODE(wa->addr == 0 ? 3 : 1) |
            RTE_WR_ACTION_MISC_HW_WR_DIS_MODE(0) |
            RTE_WR_ACTION_MISC_INTERN_ENA(dg ? 0 : 1) |
            RTE_WR_ACTION_MISC_TRANSFER_PROTECT_ENA(0) |
            RTE_WR_ACTION_MISC_RTP_STOPPED_MODE(0));
-    REG_WR(RTE_WR_RAI_ADDR(addr), gen->rai_base + conf->wr_addr);
+    REG_WR(RTE_WR_RAI_ADDR(addr), mera_addr_get(&conf->wr_addr));
     REG_WR(RTE_WR_ACTION_RTP_GRP(addr),
            RTE_WR_ACTION_RTP_GRP_RTP_GRP_ID(0) |
            RTE_WR_ACTION_RTP_GRP_RTP_GRP_STOPPED_MODE(0));
-    REG_WR(RTE_RD_RAI_ADDR(addr), dg ? 0 : (gen->rai_base + conf->rd_addr));
-    REG_WR(RTE_OFFSET_RAI_ADDR(addr), RTE_OFFSET_RAI_ADDR_OFFSET_RAI_ADDR(gen->rai_offset));
+    REG_WR(RTE_RD_RAI_ADDR(addr), dg ? 0 : mera_addr_get(&conf->rd_addr));
+    REG_WR(RTE_OFFSET_RAI_ADDR(addr), mera_addr_offset(&conf->wr_addr));
     REG_WR(RTE_BUF3_ADDR(addr), RTE_BUF3_ADDR_BUF3_ADDR(wal_id));
 
     addr = wa->addr;
-    if (gen->rai_offset != 0 && addr != 0) {
+    if (addr != 0) {
         // Write mode for next entry is NONE(0)/REL(2)
         wa = &ob->wa_tbl[addr];
         REG_WRM(RTE_WR_ACTION_MISC(addr),
@@ -577,7 +575,7 @@ int mera_ob_debug_print(struct mera_inst *inst,
         for ( ; addr != 0; addr = wa->addr) {
             wa = &ob->wa_tbl[addr];
             if (addr == wal->addr) {
-                pr("\n  Addr  RTP  DG   RD Addr     Length  WR Addr\n");
+                pr("\n  Addr  RTP  DG   RD Addr            Length  WR Addr\n");
             }
             pr("  %-6u", addr);
             internal = wa->conf.internal;
@@ -585,11 +583,10 @@ int mera_ob_debug_print(struct mera_inst *inst,
             pr("%-5s", internal ? "-" : buf);
             sprintf(buf, "%u", wa->conf.dg_id);
             pr("%-5s", internal ? "-" : buf);
-            sprintf(buf, "0x%08x", wa->conf.rd_addr);
-            pr("%-12s", internal ? buf : "-");
+            pr("%-19s", internal ? mera_addr_txt(buf, &wa->conf.rd_addr) : "-");
             sprintf(buf, "%u", wa->conf.length);
             pr("%-8s", internal ? buf : "-");
-            pr("0x%08x\n", wa->conf.wr_addr);
+            pr("%s\n", mera_addr_txt(buf, &wa->conf.wr_addr));
         }
         pr("\n");
     }

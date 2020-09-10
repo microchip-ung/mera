@@ -31,18 +31,9 @@ void mera_destroy(struct mera_inst *inst);
 
 /* - RTE general --------------------------------------------------- */
 
-// RTE I/O interface
-typedef enum {
-    MERA_IO_INTF_QSPI,  // QSPI
-    MERA_IO_INTF_PI,    // PI
-    MERA_IO_INTF_SRAM,  // SRAM
-    MERA_IO_INTF_PCIE,  // PCIe
-} mera_io_intf_t;
-
 // RTE general configuration
 typedef struct {
-    mera_bool_t    enable; // Enable/disable RTE
-    mera_io_intf_t intf;   // I/O interface
+    mera_bool_t enable; // Enable/disable RTE
 } mera_gen_conf_t;
 
 // Get RTE general configuration.
@@ -90,6 +81,19 @@ typedef enum {
     MERA_RTP_TYPE_PN,       // Profinet
     MERA_RTP_TYPE_OPC_UA,   // OPC-UA
 } mera_rtp_type_t;
+
+// RTE I/O interface
+typedef enum {
+    MERA_IO_INTF_QSPI,  // QSPI
+    MERA_IO_INTF_PI,    // PI
+    MERA_IO_INTF_SRAM,  // SRAM
+    MERA_IO_INTF_PCIE,  // PCIe
+} mera_io_intf_t;
+
+typedef struct {
+    mera_io_intf_t intf; // I/O interface
+    uint32_t       addr; // Address for read/write access
+} mera_addr_t;
 
 // Triple buffer information
 typedef struct {
@@ -165,9 +169,9 @@ typedef struct {
     mera_bool_t     internal; // Internal data transfer or data group transfer
     mera_rtp_id_t   rtp_id;   // RTP ID (non-internal transfer)
     mera_ob_dg_id_t dg_id;    // Data group ID (non-internal transfer)
-    uint32_t        rd_addr;  // Read address (internal transfer)
+    mera_addr_t     rd_addr;  // Read address (internal transfer)
     uint16_t        length;   // Data length (internal transfer)
-    uint32_t        wr_addr;  // Write address
+    mera_addr_t     wr_addr;  // Write address
 } mera_ob_wa_conf_t;
 
 // Initialize Write Action configuration
@@ -180,9 +184,6 @@ int mera_ob_wa_add(struct mera_inst        *inst,
 
 // Flush all outbound configuration
 int mera_ob_flush(struct mera_inst *inst);
-
-// TODO: Once we can find the PDU data in the DG memory, then we need to
-// continue and do the 3-buffer operation
 
 // Outbound counters
 typedef struct {
@@ -259,7 +260,7 @@ typedef uint16_t mera_ib_ra_id_t;
 // Inbound Read Action configuration
 typedef struct {
     mera_ib_ra_id_t ra_id;   // Read Action ID
-    uint32_t        rd_addr; // Read address
+    mera_addr_t     rd_addr; // Read address
     uint16_t        length;  // Data length
 } mera_ib_ra_conf_t;
 

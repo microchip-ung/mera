@@ -202,15 +202,14 @@ int mera_ib_ra_add(struct mera_inst        *inst,
                    const mera_ib_ral_id_t  ral_id,
                    const mera_ib_ra_conf_t *const conf)
 {
-    mera_gen_t          *gen;
     mera_ib_t           *ib;
     mera_ib_ral_entry_t *ral;
     mera_ib_ra_entry_t  *ra;
+    uint32_t            offset;
     uint16_t            addr, found = 0;
 
     MERA_RC(mera_ral_check(ral_id));
     inst = mera_inst_get(inst);
-    gen = &inst->gen;
     ib = &inst->ib;
     ral = &ib->ral_tbl[ral_id];
 
@@ -242,12 +241,13 @@ int mera_ib_ra_add(struct mera_inst        *inst,
     }
 
     // Update RA entry
-    REG_WR(RTE_INB_BASE_RAI_ADDR(addr), gen->rai_base + conf->rd_addr);
-    REG_WR(RTE_INB_OFFSET_RAI_ADDR(addr), gen->rai_offset);
+    REG_WR(RTE_INB_BASE_RAI_ADDR(addr), mera_addr_get(&conf->rd_addr));
+    offset = mera_addr_offset(&conf->rd_addr);
+    REG_WR(RTE_INB_OFFSET_RAI_ADDR(addr), offset);
     // Read mode is NONE(0)/REQ_REL(3)/REQ(1)
     REG_WR(RTE_INB_RD_ACTION_BUF3(addr),
            RTE_INB_RD_ACTION_BUF3_BUF3_ADDR(ral_id) |
-           RTE_INB_RD_ACTION_BUF3_BUF3_RD_MODE(gen->rai_offset == 0 ? 0 : ra->addr == 0 ? 3 : 1));
+           RTE_INB_RD_ACTION_BUF3_BUF3_RD_MODE(offset == 0 ? 0 : ra->addr == 0 ? 3 : 1));
     REG_WR(RTE_INB_RD_ACTION_MISC(addr),
            RTE_INB_RD_ACTION_MISC_DG_DATA_LEN(conf->length) |
            RTE_INB_RD_ACTION_MISC_RD_MAGIC_ENA(0) |
@@ -259,7 +259,7 @@ int mera_ib_ra_add(struct mera_inst        *inst,
            RTE_INB_RD_ACTION_ADDRS_RD_ACTION_ADDR(ra->addr));
 
     addr = ra->addr;
-    if (gen->rai_offset != 0 && addr != 0) {
+    if (offset != 0 && addr != 0) {
         // Read mode for next entry is NONE(0)/REL(2)
         ra = &ib->ra_tbl[addr];
         REG_WRM(RTE_INB_RD_ACTION_BUF3(addr),
@@ -511,8 +511,9 @@ int mera_ib_debug_print(struct mera_inst *inst,
         pr("Time  : %u.%03u usec\n", ral->conf.time / 1000, ral->conf.time % 1000);
         for ( ; addr != 0; addr = ra->addr) {
             ra = &ib->ra_tbl[addr];
-            pr("\n  Addr  RA ID  RD Addr     Length  DG_CNT\n");
-            pr("  %-6u%-7u0x%08x  %-8u%u\n", addr, ra->conf.ra_id, ra->conf.rd_addr, ra->conf.length, ra->dg_cnt);
+            pr("\n  Addr  RA ID  RD Addr            Length  DG_CNT\n");
+            pr("  %-6u%-7u%-19s%-8u%u\n",
+               addr, ra->conf.ra_id, mera_addr_txt(buf, &ra->conf.rd_addr), ra->conf.length, ra->dg_cnt);
             for (addr = ra->dg_addr; addr != 0; addr = dg->addr) {
                 dg = &ib->dg_tbl[addr];
                 if (addr == ra->dg_addr) {
