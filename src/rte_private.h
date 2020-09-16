@@ -96,6 +96,8 @@ typedef struct {
 typedef struct {
     mera_ob_wal_conf_t conf; // Configuration
     uint16_t           addr; // First WA address
+    uint16_t           prev; // Previous RA with 3-buffer setup
+    uint16_t           cnt;  // Number of RAs with 3-buffer setup
 } mera_ob_wal_entry_t;
 
 // WA entry
@@ -127,6 +129,8 @@ typedef struct {
 typedef struct {
     mera_ib_ral_conf_t conf; // Configuration
     uint16_t           addr; // First RA address
+    uint16_t           prev; // Previous RA with 3-buffer setup
+    uint16_t           cnt;  // Number of RAs with 3-buffer setup
 } mera_ib_ral_entry_t;
 
 // RA entry

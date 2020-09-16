@@ -247,7 +247,7 @@ int mera_ib_ra_add(struct mera_inst        *inst,
     // Read mode is NONE(0)/REQ_REL(3)/REQ(1)
     REG_WR(RTE_INB_RD_ACTION_BUF3(addr),
            RTE_INB_RD_ACTION_BUF3_BUF3_ADDR(ral_id) |
-           RTE_INB_RD_ACTION_BUF3_BUF3_RD_MODE(offset == 0 ? 0 : ra->addr == 0 ? 3 : 1));
+           RTE_INB_RD_ACTION_BUF3_BUF3_RD_MODE(offset == 0 ? 0 : ral->cnt == 0 ? 3 : 1));
     REG_WR(RTE_INB_RD_ACTION_MISC(addr),
            RTE_INB_RD_ACTION_MISC_DG_DATA_LEN(conf->length) |
            RTE_INB_RD_ACTION_MISC_RD_MAGIC_ENA(0) |
@@ -258,13 +258,15 @@ int mera_ib_ra_add(struct mera_inst        *inst,
            RTE_INB_RD_ACTION_ADDRS_FRM_DATA_CP_ADDR(0) |
            RTE_INB_RD_ACTION_ADDRS_RD_ACTION_ADDR(ra->addr));
 
-    addr = ra->addr;
-    if (offset != 0 && addr != 0) {
+    if (offset != 0) {
         // Read mode for next entry is NONE(0)/REL(2)
-        ra = &ib->ra_tbl[addr];
-        REG_WRM(RTE_INB_RD_ACTION_BUF3(addr),
-                RTE_INB_RD_ACTION_BUF3_BUF3_RD_MODE(ra->addr == 0 ? 2 : 0),
-                RTE_INB_RD_ACTION_BUF3_BUF3_RD_MODE_M);
+        if (ral->prev != 0) {
+            REG_WRM(RTE_INB_RD_ACTION_BUF3(ral->prev),
+                    RTE_INB_RD_ACTION_BUF3_BUF3_RD_MODE(ral->cnt == 1 ? 2 : 0),
+                    RTE_INB_RD_ACTION_BUF3_BUF3_RD_MODE_M);
+        }
+        ral->cnt++;
+        ral->prev = addr;
     }
 
     // Update RAL

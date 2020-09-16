@@ -125,11 +125,18 @@ int mera_ob_rtp_conf_set(struct mera_inst         *inst,
 // Outbound Data Group ID, must be unique for RTP
 typedef uint16_t mera_ob_dg_id_t;
 
+// Maximum size of data group
+#define MERA_DATA_GROUP_CNT 1500
+
 // Outbound Data Group configuration
 typedef struct {
-    mera_ob_dg_id_t dg_id;      // Data group ID
-    uint16_t        pdu_offset; // PDU offset after Ethernet Type
-    uint16_t        length;     // Data length
+    mera_ob_dg_id_t dg_id;           // Data group ID
+    uint16_t        pdu_offset;      // PDU offset after Ethernet Type
+    uint16_t        length;          // Data length (copied from PDU offset)
+    uint16_t        valid_offset;    // Offset after Ethernet Type to Profinet IOPS or OPC DataSetFlags1
+    mera_bool_t     valid_chk;       // Profinet (IOPS bit 7) or OPC (DataSetFlags1 bit 0) valid check
+    mera_bool_t     invalid_default; // Invalid data action: Write defaults (true) or last valid (false)
+    uint8_t         data[MERA_DATA_GROUP_CNT]; // Default data
 } mera_ob_dg_conf_t;
 
 // Initalize Outbound DG configuration
