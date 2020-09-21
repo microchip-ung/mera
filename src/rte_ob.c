@@ -17,13 +17,14 @@ int mera_ob_init(struct mera_inst *inst)
     REG_WR(RTE_OUTB_RTP_STATE, 0xffffffff);
     REG_WR(RTE_OUTB_CFG, RTE_OUTB_CFG_OUTB_PORT(4));
 
-    // Data/transfer status checks
+    // PN PDU/DG checks
     REG_WR(RTE_OUTB_PN_PDU_MISC,
            RTE_OUTB_PN_PDU_MISC_PN_DATA_STATUS_MASK(RTE_OB_PN_DS_MASK) |
            RTE_OUTB_PN_PDU_MISC_PN_DATA_STATUS_VALID_CHK_ENA(0) |
            RTE_OUTB_PN_PDU_MISC_PN_TRANSFER_STATUS_CHK_ENA(1));
+    REG_WR(RTE_OUTB_PN_DG_MASKS, RTE_OUTB_PN_DG_MASKS_PN_IOPS_MASK(0x80)); // IOPS bit 7 is DataState
 
-    // OPC PDU checks
+    // OPC PDU/DG checks
     REG_WR(RTE_OUTB_OPC_PDU_FLAGS,
            RTE_OUTB_OPC_PDU_FLAGS_OPC_EXT_FLAGS1_VAL(0x01) |
            RTE_OUTB_OPC_PDU_FLAGS_OPC_EXT_FLAGS1_MASK(0xff) |
@@ -35,6 +36,9 @@ int mera_ob_init(struct mera_inst *inst)
            RTE_OUTB_OPC_PDU_MISC_OPC_VER(1) |
            RTE_OUTB_OPC_PDU_MISC_OPC_GRP_VER_CHK_ENA(1) |
            RTE_OUTB_OPC_PDU_MISC_OPC_NETWORK_MSG_NUM(1));
+    REG_WR(RTE_OUTB_OPC_DG_MASKS,
+           RTE_OUTB_OPC_DG_MASKS_OPC_STATUS_CODE_MASK(0xc000) |   // StatusCode bit 14:15 is Severity
+           RTE_OUTB_OPC_DG_MASKS_OPC_DATA_SET_FLAGS1_MASK(0x01)); // DataSetFlagss bit 1 is DataValid
 
     // Profinet DataStatus default
     for (i = 1; i < RTE_OB_RTP_CNT; i++) {
@@ -216,7 +220,7 @@ int mera_ob_dg_add(struct mera_inst        *inst,
                RTE_OUTB_DG_DATA_SECTION_ADDR_DG_DATA_LEN(cur->length));
         if (rtp->conf.type == MERA_RTP_TYPE_PN) {
             REG_WR(RTE_OUTB_PN_IOPS(addr),
-                   RTE_OUTB_PN_IOPS_PN_IOPS_VAL(0) |
+                   RTE_OUTB_PN_IOPS_PN_IOPS_VAL(0x80) |
                    RTE_OUTB_PN_IOPS_PN_IOPS_OFFSET_PDU_POS(cur->valid_offset) |
                    RTE_OUTB_PN_IOPS_PN_IOPS_CHK_ENA(cur->valid_chk) |
                    RTE_OUTB_PN_IOPS_PN_IOPS_MISMATCH_SKIP_ENA(1));
@@ -225,10 +229,70 @@ int mera_ob_dg_add(struct mera_inst        *inst,
                    RTE_OUTB_OPC_DATA_SET_FLAGS1_MISC_OPC_DATA_SET_FLAGS1_OFFSET_PDU_POS(cur->valid_offset) |
                    RTE_OUTB_OPC_DATA_SET_FLAGS1_MISC_OPC_DATA_SET_FLAGS1_MISMATCH_SKIP_ENA(1) |
                    RTE_OUTB_OPC_DATA_SET_FLAGS1_MISC_OPC_DATA_SET_FLAGS1_CHK_ENA(cur->valid_chk));
-            REG_WR(RTE_OUTB_OPC_SEQ_NUM(addr), RTE_OUTB_OPC_SEQ_NUM_OPC_SEQ_NUM_CHK_ENA(0));
+            REG_WR(RTE_OUTB_OPC_SEQ_NUM(addr), RTE_OUTB_OPC_SEQ_NUM_OPC_SEQ_NUM_CHK_ENA(cur->opc_seq_chk));
+            REG_WR(RTE_OUTB_OPC_DATA_SET_FLAGS1_VAL(addr),
+                   RTE_OUTB_OPC_DATA_SET_FLAGS1_VAL_OPC_DATA_SET_FLAGS1_VAL(0x01)); // DataSetFlagss bit 1 is DataValid
+            REG_WR(RTE_OUTB_OPC_STATUS_CODE_MISC(addr),
+                   RTE_OUTB_OPC_STATUS_CODE_MISC_OPC_STATUS_CODE_CHK_ENA(cur->opc_code_chk) |
+                   RTE_OUTB_OPC_STATUS_CODE_MISC_OPC_STATUS_CODE_MISMATCH_SKIP_ENA(1) |
+                   RTE_OUTB_OPC_STATUS_CODE_MISC_OPC_FAIL_SEVERITY_VAL(0));
+            REG_WR(RTE_OUTB_OPC_STATUS_CODE_VAL(addr),
+                   RTE_OUTB_OPC_STATUS_CODE_VAL_OPC_STATUS_CODE_VAL(0)); // StatusCode/Severity 0 is Good
         }
         addr = dg->addr;
     }
+    return 0;
+}
+
+int mera_ob_dg_status_get(struct mera_inst      *inst,
+                          const mera_rtp_id_t   rtp_id,
+                          const mera_ob_dg_id_t dg_id,
+                          mera_ob_dg_status_t   *const status)
+{
+    mera_ob_t           *ob;
+    mera_ob_rtp_entry_t *rtp;
+    mera_ob_dg_entry_t  *dg;
+    uint32_t            sticky, pn, opc;
+    uint16_t            addr;
+
+    T_I("enter");
+    MERA_RC(mera_rtp_check(rtp_id));
+    inst = mera_inst_get(inst);
+    ob = &inst->ob;
+    rtp = &ob->rtp_tbl[rtp_id];
+    for (addr = rtp->addr; addr != 0; ) {
+        dg = &ob->dg_tbl[addr];
+        if (dg->conf.dg_id == dg_id) {
+            // ID found
+            break;
+        }
+        addr = dg->addr;
+    }
+    if (addr == 0) {
+        T_E("rtp_id %u, dg_id %u not found", rtp_id, dg_id);
+        return -1;
+    }
+
+    // Read and clear sticky bits
+    memset(status, 0, sizeof(*status));
+    REG_RD(RTE_OUTB_DG_STICKY_BITS(addr), &sticky);
+    REG_RD(RTE_OUTB_PN_STATUS(addr), &pn);
+    REG_RD(RTE_OUTB_OPC_STATUS(addr), &opc);
+    if (RTE_OUTB_DG_STICKY_BITS_PN_IOPS_MISMATCH_STICKY_X(sticky)) {
+        status->valid_chk = 1;
+        status->valid = RTE_OUTB_PN_STATUS_PN_IOPS_MISMATCH_VAL_X(pn);
+    } else if (RTE_OUTB_DG_STICKY_BITS_OPC_DATA_SET_FLAGS1_MISMATCH_STICKY_X(sticky)) {
+        status->valid_chk = 1;
+        status->valid = RTE_OUTB_OPC_STATUS_OPC_DATA_SET_FLAGS1_MISMATCH_VAL_X(opc);
+    }
+    if (RTE_OUTB_DG_STICKY_BITS_OPC_STATUS_CODE_MISMATCH_STICKY_X(sticky)) {
+        status->opc_code_chk = 1;
+        status->opc_code = RTE_OUTB_OPC_STATUS_OPC_STATUS_CODE_MISMATCH_VAL_X(opc);
+    }
+    REG_WR(RTE_OUTB_DG_STICKY_BITS(addr),
+           RTE_OUTB_DG_STICKY_BITS_PN_IOPS_MISMATCH_STICKY(1) |
+           RTE_OUTB_DG_STICKY_BITS_OPC_DATA_SET_FLAGS1_MISMATCH_STICKY(1) |
+           RTE_OUTB_DG_STICKY_BITS_OPC_STATUS_CODE_MISMATCH_STICKY(1));
     return 0;
 }
 
@@ -311,7 +375,7 @@ int mera_ob_wa_add(struct mera_inst        *inst,
             addr = dg->addr;
         }
         if (found == 0) {
-            T_E("DG ID %u not found", conf->dg_id);
+            T_E("rtp_id %u, dg_id %u not found", conf->rtp_id, conf->dg_id);
             return -1;
         }
     }
@@ -536,10 +600,13 @@ int mera_ob_debug_print(struct mera_inst *inst,
 {
     mera_ob_t              *ob = &inst->ob;
     mera_ob_rtp_entry_t    *rtp;
+    mera_ob_rtp_conf_t     *rc;
     mera_ob_rtp_counters_t cnt;
     mera_ob_dg_entry_t     *dg;
+    mera_ob_dg_conf_t      *dc;
     mera_ob_wal_entry_t    *wal;
     mera_ob_wa_entry_t     *wa;
+    mera_ob_wa_conf_t      *wc;
     const char             *txt;
     uint32_t               value, len, pos, idx, i, j, addr = ob->dg_addr;
     mera_bool_t            internal;
@@ -555,8 +622,9 @@ int mera_ob_debug_print(struct mera_inst *inst,
 
     for (i = 1; i < RTE_OB_RTP_CNT; i++) {
         rtp = &ob->rtp_tbl[i];
+        rc = &rtp->conf;
         addr = rtp->addr;
-        switch (rtp->conf.type) {
+        switch (rc->type) {
         case MERA_RTP_TYPE_PN:
             txt = "Profinet";
             break;
@@ -573,8 +641,8 @@ int mera_ob_debug_print(struct mera_inst *inst,
         pr("RTP ID: %u\n", i);
         pr("Type  : %s\n", txt);
         pr("WAL ID: ");
-        if (rtp->conf.wal_enable) {
-            pr("%u", rtp->conf.wal_id);
+        if (rc->wal_enable) {
+            pr("%u", rc->wal_id);
         } else {
             pr("-");
         }
@@ -585,12 +653,13 @@ int mera_ob_debug_print(struct mera_inst *inst,
         }
         for ( ; addr != 0; addr = dg->addr) {
             dg = &ob->dg_tbl[addr];
+            dc = &dg->conf;
             if (addr == rtp->addr) {
-                pr("\n  Addr  DG ID  PDU   DG_Addr  Length  Val_Chk  Val_Off  Inv_def\n");
+                pr("\n  Addr  DG ID  PDU   DG_Addr  Length  Val_Chk  Val_Off  Seq_Chk  Code_Chk  Inv_def\n");
             }
-            pr("  %-6u%-7u%-6u%-9u%-8u%-9u%-9u%-9u\n",
-               addr, dg->conf.dg_id, dg->conf.pdu_offset, dg->dg_addr, dg->conf.length,
-               dg->conf.valid_chk, dg->conf.valid_offset, dg->conf.invalid_default);
+            pr("  %-6u%-7u%-6u%-9u%-8u%-9u%-9u%-9u%-9u%-9u\n",
+               addr, dc->dg_id, dc->pdu_offset, dg->dg_addr, dc->length, dc->valid_chk,
+               dc->valid_offset, dc->opc_seq_chk, dc->opc_code_chk, dc->invalid_default);
         }
         pr("\n");
     }
@@ -605,19 +674,20 @@ int mera_ob_debug_print(struct mera_inst *inst,
         pr("Time  : %u.%03u usec\n", wal->conf.time / 1000, wal->conf.time % 1000);
         for ( ; addr != 0; addr = wa->addr) {
             wa = &ob->wa_tbl[addr];
+            wc = &wa->conf;
             if (addr == wal->addr) {
                 pr("\n  Addr  RTP  DG   RD Addr            Length  WR Addr\n");
             }
             pr("  %-6u", addr);
-            internal = wa->conf.internal;
-            sprintf(buf, "%u", wa->conf.rtp_id);
+            internal = wc->internal;
+            sprintf(buf, "%u", wc->rtp_id);
             pr("%-5s", internal ? "-" : buf);
-            sprintf(buf, "%u", wa->conf.dg_id);
+            sprintf(buf, "%u", wc->dg_id);
             pr("%-5s", internal ? "-" : buf);
-            pr("%-19s", internal ? mera_addr_txt(buf, &wa->conf.rd_addr) : "-");
-            sprintf(buf, "%u", wa->conf.length);
+            pr("%-19s", internal ? mera_addr_txt(buf, &wc->rd_addr) : "-");
+            sprintf(buf, "%u", wc->length);
             pr("%-8s", internal ? buf : "-");
-            pr("%s\n", mera_addr_txt(buf, &wa->conf.wr_addr));
+            pr("%s\n", mera_addr_txt(buf, &wc->wr_addr));
         }
         pr("\n");
     }
@@ -631,6 +701,7 @@ int mera_ob_debug_print(struct mera_inst *inst,
     DBG_PR_REG_M("STATUS_MASK", RTE_OUTB_PN_PDU_MISC_PN_DATA_STATUS_MASK, value);
     DBG_PR_REG_M("VALID_CHK_ENA", RTE_OUTB_PN_PDU_MISC_PN_DATA_STATUS_VALID_CHK_ENA, value);
     DBG_PR_REG_M("TRANSFER_CHK_ENA", RTE_OUTB_PN_PDU_MISC_PN_TRANSFER_STATUS_CHK_ENA, value);
+    DBG_REG(REG_ADDR(RTE_OUTB_PN_DG_MASKS), "PN_DG_MASKS");
     REG_RD(RTE_OUTB_OPC_PDU_FLAGS, &value);
     DBG_PR_REG("OPC_PDU_FLAGS", value);
     DBG_PR_REG_M("EXT_FLAGS1_VAL", RTE_OUTB_OPC_PDU_FLAGS_OPC_EXT_FLAGS1_VAL, value);
@@ -644,6 +715,11 @@ int mera_ob_debug_print(struct mera_inst *inst,
     DBG_PR_REG_M("VER", RTE_OUTB_OPC_PDU_MISC_OPC_VER, value);
     DBG_PR_REG_M("GRP_VER_CHK_ENA", RTE_OUTB_OPC_PDU_MISC_OPC_GRP_VER_CHK_ENA, value);
     DBG_PR_REG_M("NMSG_NUM", RTE_OUTB_OPC_PDU_MISC_OPC_NETWORK_MSG_NUM, value);
+    REG_RD(RTE_OUTB_OPC_DG_MASKS, &value);
+    DBG_PR_REG("OPC_DG_MASKS", value);
+    DBG_PR_REG_M("STATUS_CODE_MASK", RTE_OUTB_OPC_DG_MASKS_OPC_STATUS_CODE_MASK, value);
+    DBG_PR_REG_M("DATA_SET_FLAGS1_MASK", RTE_OUTB_OPC_DG_MASKS_OPC_DATA_SET_FLAGS1_MASK, value);
+
     DBG_REG(REG_ADDR(RTE_OUTB_STICKY_BITS), "STICKY_BITS");
     DBG_REG(REG_ADDR(RTE_OUTB_BUS_ERROR), "BUS_ERROR");
     pr("\n");

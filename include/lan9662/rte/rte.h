@@ -135,6 +135,8 @@ typedef struct {
     uint16_t        length;          // Data length (copied from PDU offset)
     uint16_t        valid_offset;    // Offset after Ethernet Type to Profinet IOPS or OPC DataSetFlags1
     mera_bool_t     valid_chk;       // Profinet (IOPS bit 7) or OPC (DataSetFlags1 bit 0) valid check
+    mera_bool_t     opc_seq_chk;     // OPC MessageSequenceNumber check
+    mera_bool_t     opc_code_chk;    // OPC StatusCode/Severity check (bit 30:31 must be zero)
     mera_bool_t     invalid_default; // Invalid data action: Write defaults (true) or last valid (false)
     uint8_t         data[MERA_DATA_GROUP_CNT]; // Default data
 } mera_ob_dg_conf_t;
@@ -146,6 +148,20 @@ int mera_ob_dg_init(mera_ob_dg_conf_t *const conf);
 int mera_ob_dg_add(struct mera_inst        *inst,
                    const mera_rtp_id_t     rtp_id,
                    const mera_ob_dg_conf_t *const conf);
+
+// Outbound DG status
+typedef struct {
+    mera_bool_t valid_chk;    // Valid check failed
+    uint8_t     valid;        // Failed IOPS/DataSetFlags1
+    mera_bool_t opc_code_chk; // OPC StatusCode/Severity check failed
+    uint16_t    opc_code;     // Failed OPC StatusCode
+} mera_ob_dg_status_t;
+
+// Get and clear Outbound DG status
+int mera_ob_dg_status_get(struct mera_inst      *inst,
+                          const mera_rtp_id_t   rtp_id,
+                          const mera_ob_dg_id_t dg_id,
+                          mera_ob_dg_status_t   *const status);
 
 // Outbound Write Action List configuration
 typedef struct {

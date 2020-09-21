@@ -65,6 +65,7 @@ int mera_ib_rtp_conf_set(struct mera_inst         *inst,
            RTE_INB_RTP_MISC_LAST_FRM_UPD_CNT(0) |
            RTE_INB_RTP_MISC_OTF_TIMER_RESTART_ENA(0) |
            RTE_INB_RTP_MISC_RTP_GRP_ID(0));
+    REG_WR(RTE_INB_RTP_FRM_POS(rtp_id), RTE_INB_RTP_FRM_POS_PN_CC_FRM_POS(len - 8));
     cnt = ((len + 31) / 32);
     if (len_old == 0) {
         // Allocate new frame data address
@@ -554,6 +555,7 @@ int mera_ib_debug_print(struct mera_inst *inst,
         DBG_PR_REG("FRM_PORT", value);
         DBG_PR_REG_M("FRM_LEN", RTE_INB_RTP_FRM_PORT_FRM_LEN, value);
         DBG_PR_REG_M("PORT_NUM", RTE_INB_RTP_FRM_PORT_PORT_NUM, value);
+        DBG_REG(REG_ADDR(RTE_INB_RTP_FRM_POS(i)), "RTP_FRM_POS");
         REG_RD(RTE_INB_RTP_ADDRS(i), &value);
         base = RTE_INB_RTP_ADDRS_FRM_DATA_ADDR_X(value);
         DBG_PR_REG("ADDRS", value);
