@@ -7,6 +7,11 @@
 int mera_ib_init(struct mera_inst *inst)
 {
     T_I("enter");
+
+    // DG status clear/set values for OPC: BadFailure/Good
+    REG_WR(RTE_INB_DG_STATUS_CLR_SET,
+           RTE_INB_DG_STATUS_CLR_SET_OPC_DG_STATUS_CLR(0x40) |
+           RTE_INB_DG_STATUS_CLR_SET_OPC_DG_STATUS_SET(0x00));
     return 0;
 }
 
@@ -29,6 +34,7 @@ int mera_ib_rtp_conf_set(struct mera_inst         *inst,
 {
     mera_ib_t           *ib;
     mera_ib_rtp_entry_t *rtp;
+    mera_rte_time_t     time;
     uint32_t            type = (conf->type == MERA_RTP_TYPE_OPC_UA ? 1 : 0);
     uint32_t            ena = (conf->type == MERA_RTP_TYPE_DISABLED ? 0 : 1);
     uint32_t            len = (conf->length < 60 ? 60 : conf->length);
@@ -39,6 +45,8 @@ int mera_ib_rtp_conf_set(struct mera_inst         *inst,
     inst = mera_inst_get(inst);
     ib = &inst->ib;
     MERA_RC(mera_rtp_check(rtp_id));
+    rtp = &ib->rtp_tbl[rtp_id];
+    MERA_RC(mera_time_get(inst, &conf->time, &time));
 
     // Check frame length
     if (len > MERA_FRAME_DATA_CNT) {
@@ -48,12 +56,29 @@ int mera_ib_rtp_conf_set(struct mera_inst         *inst,
     len += (IFH_LEN + 4);
     REG_RD(RTE_INB_RTP_FRM_PORT(rtp_id), &value);
     len_old = RTE_INB_RTP_FRM_PORT_FRM_LEN_X(value);
-    if (len_old != 0 && len_old != len) {
-        T_E("length can not be changed");
-        return -1;
+    cnt = ((len + 31) / 32);
+    if (len_old == 0) {
+        // Allocate new frame data address
+        addr = ib->frm_data_addr;
+        if ((addr + cnt) > RTE_IB_FRAME_MEM_SIZE) {
+            T_E("frame memory is full");
+            return -1;
+        }
+        rtp->frm_data_addr = addr;
+        ib->frm_data_addr += cnt;
+        REG_WR(RTE_INB_RTP_ADDRS(rtp_id),
+               RTE_INB_RTP_ADDRS_FRM_DATA_ADDR(addr) |
+               RTE_INB_RTP_ADDRS_REDUN_ADDR(0));
+    } else {
+        // Reuse existing frame data address
+        if (len_old != len) {
+            T_E("length can not be changed");
+            return -1;
+        }
+        REG_RD(RTE_INB_RTP_ADDRS(rtp_id), &value);
+        addr = RTE_INB_RTP_ADDRS_FRM_DATA_ADDR_X(value);
     }
 
-    rtp = &ib->rtp_tbl[rtp_id];
     rtp->conf = *conf;
     REG_WR(RTE_INB_RTP_FRM_PORT(rtp_id),
            RTE_INB_RTP_FRM_PORT_FRM_LEN(len) |
@@ -66,28 +91,8 @@ int mera_ib_rtp_conf_set(struct mera_inst         *inst,
            RTE_INB_RTP_MISC_OTF_TIMER_RESTART_ENA(0) |
            RTE_INB_RTP_MISC_RTP_GRP_ID(0));
     REG_WR(RTE_INB_RTP_FRM_POS(rtp_id), RTE_INB_RTP_FRM_POS_PN_CC_FRM_POS(len - 8));
-    cnt = ((len + 31) / 32);
-    if (len_old == 0) {
-        // Allocate new frame data address
-        addr = ib->frm_data_addr;
-        rtp->frm_data_addr = addr;
-        ib->frm_data_addr += cnt;
-        REG_WR(RTE_INB_RTP_ADDRS(rtp_id),
-               RTE_INB_RTP_ADDRS_FRM_DATA_ADDR(addr) |
-               RTE_INB_RTP_ADDRS_REDUN_ADDR(0));
-    } else {
-        // Reuse existing frame data address
-        REG_RD(RTE_INB_RTP_ADDRS(rtp_id), &value);
-        addr = RTE_INB_RTP_ADDRS_FRM_DATA_ADDR_X(value);
-    }
-
-    // If conf->time is zero, it is a one-shot and we set FIRST to delay the frame.
-    // The delayed one-shot frame is a test feature.
-    REG_RD(RTE_SC_TIME, &value);
-    value = (conf->time ? 0 : RTE_SC_TIME_SC_RUT_CNT_X(value));
-    REG_WR(RTE_INB_RTP_TIMER_CFG1(rtp_id), RTE_INB_RTP_TIMER_CFG1_FIRST_RUT_CNT(value));
-    REG_WR(RTE_INB_RTP_TIMER_CFG2(rtp_id),
-           RTE_INB_RTP_TIMER_CFG2_DELTA_RUT_CNT(MERA_RUT_TIME(conf->time)));
+    REG_WR(RTE_INB_RTP_TIMER_CFG1(rtp_id), RTE_INB_RTP_TIMER_CFG1_FIRST_RUT_CNT(time.first));
+    REG_WR(RTE_INB_RTP_TIMER_CFG2(rtp_id), RTE_INB_RTP_TIMER_CFG2_DELTA_RUT_CNT(time.delta));
     REG_WR(RTE_INB_TIMER_CMD,
            RTE_INB_TIMER_CMD_TIMER_CMD(ena && inj ? 2 : 1) |
            RTE_INB_TIMER_CMD_TIMER_RSLT(0) |
@@ -146,16 +151,14 @@ int mera_ib_ral_conf_set(struct mera_inst         *inst,
                          const mera_ib_ral_id_t   ral_id,
                          const mera_ib_ral_conf_t *const conf)
 {
-    uint32_t value;
+    mera_rte_time_t time;
 
     MERA_RC(mera_ral_check(ral_id));
     inst = mera_inst_get(inst);
+    MERA_RC(mera_time_get(inst, &conf->time, &time));
     inst->ib.ral_tbl[ral_id].conf = *conf;
-    REG_RD(RTE_SC_TIME, &value);
-    value = (conf->time ? 0 : RTE_SC_TIME_SC_RUT_CNT_X(value));
-    REG_WR(RTE_INB_RD_TIMER_CFG1(ral_id), RTE_INB_RD_TIMER_CFG1_FIRST_RUT_CNT(value));
-    REG_WR(RTE_INB_RD_TIMER_CFG2(ral_id),
-           RTE_INB_RD_TIMER_CFG2_DELTA_RUT_CNT(MERA_RUT_TIME(conf->time)));
+    REG_WR(RTE_INB_RD_TIMER_CFG1(ral_id), RTE_INB_RD_TIMER_CFG1_FIRST_RUT_CNT(time.first));
+    REG_WR(RTE_INB_RD_TIMER_CFG2(ral_id), RTE_INB_RD_TIMER_CFG2_DELTA_RUT_CNT(time.delta));
     REG_WR(RTE_INB_TIMER_CMD,
            RTE_INB_TIMER_CMD_TIMER_CMD(2) |
            RTE_INB_TIMER_CMD_TIMER_RSLT(0) |
@@ -292,7 +295,7 @@ int mera_ib_dg_add(struct mera_inst        *inst,
     mera_ib_ra_entry_t  *ra;
     mera_ib_dg_entry_t  *dg;
     uint16_t            addr, ra_addr = 0, found = 0;
-    uint32_t            frm_addr;
+    uint32_t            frm_addr, valid_mode, status_mode, opc;
 
     inst = mera_inst_get(inst);
     ib = &inst->ib;
@@ -317,7 +320,7 @@ int mera_ib_dg_add(struct mera_inst        *inst,
         T_E("RA ID %u not found in RAL %u", ra_id, ral_id);
         return -1;
     }
-    if (ra->dg_cnt >= 4) {
+    if (ra->dg_cnt >= RTE_IB_RA_DG_CNT) {
         T_E("RA ID %u in RAL %u has full DG list", ra_id, ral_id);
         return -1;
     }
@@ -343,19 +346,23 @@ int mera_ib_dg_add(struct mera_inst        *inst,
     // Update DG
     REG_WR(RTE_INB_FRM_DATA_CP_ADDRS(addr),
            RTE_INB_FRM_DATA_CP_ADDRS_FRM_DATA_CP_ADDR(dg->addr) |
-           RTE_INB_FRM_DATA_CP_ADDRS_FRM_DATA_CTRL_ADDR(0));
-    frm_addr = (rtp->frm_data_addr * 32 + IFH_LEN + 14 + conf->pdu_offset);
+           RTE_INB_FRM_DATA_CP_ADDRS_FRM_DATA_CTRL_ADDR(rtp->frm_data_addr));
+    frm_addr = (rtp->frm_data_addr * 32 + IFH_LEN + 14);
     REG_WR(RTE_INB_FRM_DATA_BYTE_ADDR1(addr),
-           RTE_INB_FRM_DATA_BYTE_ADDR1_DG_FRM_DATA_BYTE_ADDR(frm_addr) |
-           RTE_INB_FRM_DATA_BYTE_ADDR1_DG_VLD_FRM_DATA_BYTE_ADDR(frm_addr));
+           RTE_INB_FRM_DATA_BYTE_ADDR1_DG_FRM_DATA_BYTE_ADDR(frm_addr + conf->pdu_offset) |
+           RTE_INB_FRM_DATA_BYTE_ADDR1_DG_VLD_FRM_DATA_BYTE_ADDR(frm_addr + conf->valid_offset));
     REG_WR(RTE_INB_FRM_DATA_BYTE_ADDR2(addr),
-           RTE_INB_FRM_DATA_BYTE_ADDR2_DG_STATUS_FRM_DATA_BYTE_ADDR(frm_addr));
+           RTE_INB_FRM_DATA_BYTE_ADDR2_DG_STATUS_FRM_DATA_BYTE_ADDR(frm_addr + conf->valid_offset + 3));
+
+    opc = (rtp->conf.type == MERA_RTP_TYPE_OPC_UA ? 1 : 0);
+    valid_mode = (conf->valid_update == 0 ? 0 : opc ? 2 : 1);
+    status_mode = (conf->opc_code_update && opc ? 2 : 0);
     REG_WR(RTE_INB_FRM_DATA_CP_MISC(addr),
-           RTE_INB_FRM_DATA_CP_MISC_DG_VLD_CLR_MODE(0) |
-           RTE_INB_FRM_DATA_CP_MISC_DG_VLD_SET_MODE(0) |
+           RTE_INB_FRM_DATA_CP_MISC_DG_VLD_CLR_MODE(valid_mode) |
+           RTE_INB_FRM_DATA_CP_MISC_DG_VLD_SET_MODE(valid_mode) |
            RTE_INB_FRM_DATA_CP_MISC_DG_VLD_ERR_MODE(0) |
-           RTE_INB_FRM_DATA_CP_MISC_DG_STATUS_CLR_MODE(0) |
-           RTE_INB_FRM_DATA_CP_MISC_DG_STATUS_SET_MODE(0) |
+           RTE_INB_FRM_DATA_CP_MISC_DG_STATUS_CLR_MODE(status_mode) |
+           RTE_INB_FRM_DATA_CP_MISC_DG_STATUS_SET_MODE(status_mode) |
            RTE_INB_FRM_DATA_CP_MISC_DG_STATUS_ERR_MODE(0) |
            RTE_INB_FRM_DATA_CP_MISC_SOF(0) |
            RTE_INB_FRM_DATA_CP_MISC_EOF(0) |
@@ -450,13 +457,15 @@ int mera_ib_debug_print(struct mera_inst *inst,
 {
     mera_ib_t              *ib = &inst->ib;
     mera_ib_rtp_entry_t    *rtp;
+    mera_ib_rtp_conf_t     *rc;
     mera_ib_rtp_counters_t cnt;
     mera_ib_ral_entry_t    *ral;
     mera_ib_ra_entry_t     *ra;
     mera_ib_dg_entry_t     *dg;
+    mera_ib_dg_conf_t      *dc;
     const char             *txt;
     uint32_t               i, j, k, m, value, chg, base, addr, len;
-    char                   buf[32];
+    char                   buf[64];
 
     mera_debug_print_header(pr, "RTE Inbound State");
     pr("Next RTP ID    : %u\n", ib->rtp_id);
@@ -465,7 +474,8 @@ int mera_ib_debug_print(struct mera_inst *inst,
 
     for (i = 1; i < RTE_OB_RTP_CNT; i++) {
         rtp = &ib->rtp_tbl[i];
-        switch (rtp->conf.type) {
+        rc = &rtp->conf;
+        switch (rc->type) {
         case MERA_RTP_TYPE_PN:
             txt = "Profinet";
             break;
@@ -481,9 +491,9 @@ int mera_ib_debug_print(struct mera_inst *inst,
         }
         pr("RTP ID: %u\n", i);
         pr("Type  : %s\n", txt);
-        pr("Mode  : %s\n", rtp->conf.mode == MERA_RTP_IB_MODE_INJ ? "INJ" : "OTF");
-        pr("Time  : %u.%03u usec\n", rtp->conf.time / 1000, rtp->conf.time % 1000);
-        len = rtp->conf.length;
+        pr("Mode  : %s\n", rc->mode == MERA_RTP_IB_MODE_INJ ? "INJ" : "OTF");
+        pr("Time  : %s\n", mera_time_txt(buf, &rc->time));
+        len = rc->length;
         pr("Length: %u\n", len);
         if (mera_ib_rtp_counters_update(inst, i, &cnt, 0) == 0) {
             pr("Tx Inj: %" PRIu64 "\n", cnt.tx_inj);
@@ -496,7 +506,7 @@ int mera_ib_debug_print(struct mera_inst *inst,
             if (k == 0) {
                 pr("%04x: ", j);
             }
-            pr("%02x%s", rtp->conf.data[j],
+            pr("%02x%s", rc->data[j],
                j == (len - 1) || k == 31 ? "\n" : (j % 4) == 3 ? "-" : "");
         }
         if (len) {
@@ -511,7 +521,7 @@ int mera_ib_debug_print(struct mera_inst *inst,
             continue;
         }
         pr("RAL ID: %u\n", i);
-        pr("Time  : %u.%03u usec\n", ral->conf.time / 1000, ral->conf.time % 1000);
+        pr("Time  : %s\n", mera_time_txt(buf, &ral->conf.time));
         for ( ; addr != 0; addr = ra->addr) {
             ra = &ib->ra_tbl[addr];
             pr("\n  Addr  RA ID  RD Addr            Length  DG_CNT\n");
@@ -519,10 +529,12 @@ int mera_ib_debug_print(struct mera_inst *inst,
                addr, ra->conf.ra_id, mera_addr_txt(buf, &ra->conf.rd_addr), ra->conf.length, ra->dg_cnt);
             for (addr = ra->dg_addr; addr != 0; addr = dg->addr) {
                 dg = &ib->dg_tbl[addr];
+                dc = &dg->conf;
                 if (addr == ra->dg_addr) {
-                    pr("\n    Addr  RTP  PDU\n");
+                    pr("\n    Addr  RTP  PDU   Vld_Off  Vld_Upd  Code_Upd\n");
                 }
-                pr("    %-6u%-5u%u\n", addr, dg->conf.rtp_id, dg->conf.pdu_offset);
+                pr("    %-6u%-5u%-6u%-9u%-9u%u\n", addr, dc->rtp_id,
+                   dc->pdu_offset, dc->valid_offset, dc->valid_update, dc->opc_code_update);
             }
         }
         pr("\n");
@@ -531,6 +543,18 @@ int mera_ib_debug_print(struct mera_inst *inst,
     mera_debug_print_header(pr, "RTE Inbound Registers");
     mera_debug_print_reg_header(pr, "RTE Inbound");
     DBG_REG(REG_ADDR(RTE_INB_CFG), "RTE_INB_CFG");
+    REG_RD(RTE_INB_DG_VLD_CLR_SET, &value);
+    DBG_PR_REG("VLD_CLR_SET", value);
+    DBG_PR_REG_M("CLR_IOPS", RTE_INB_DG_VLD_CLR_SET_PN_DG_VLD_CLR_IOPS, value);
+    DBG_PR_REG_M("CLR_DSF1", RTE_INB_DG_VLD_CLR_SET_OPC_DG_VLD_CLR_DATA_SET_FLAGS1, value);
+    DBG_PR_REG_M("SET_IOPS", RTE_INB_DG_VLD_CLR_SET_PN_DG_VLD_SET_IOPS, value);
+    DBG_PR_REG_M("SET_DSF1", RTE_INB_DG_VLD_CLR_SET_OPC_DG_VLD_SET_DATA_SET_FLAGS1, value);
+    REG_RD(RTE_INB_DG_STATUS_CLR_SET, &value);
+    DBG_PR_REG("STATUS_CLR_SET", value);
+    DBG_PR_REG_M("PN_DG_STATUS_CLR", RTE_INB_DG_STATUS_CLR_SET_PN_DG_STATUS_CLR, value);
+    DBG_PR_REG_M("OPC_DG_STATUS_CLR", RTE_INB_DG_STATUS_CLR_SET_OPC_DG_STATUS_CLR, value);
+    DBG_PR_REG_M("PN_DG_STATUS_SET", RTE_INB_DG_STATUS_CLR_SET_PN_DG_STATUS_SET, value);
+    DBG_PR_REG_M("OPC_DG_STATUS_SET", RTE_INB_DG_STATUS_CLR_SET_OPC_DG_STATUS_SET, value);
     DBG_REG(REG_ADDR(RTE_INB_STICKY_BITS), "RTE_INB_STICKY_BITS");
     pr("\n");
 
@@ -561,6 +585,13 @@ int mera_ib_debug_print(struct mera_inst *inst,
         DBG_PR_REG("ADDRS", value);
         DBG_PR_REG(":FRM_DATA_ADDR", base);
         DBG_PR_REG(":REDUN_ADDR", RTE_INB_RTP_ADDRS_REDUN_ADDR_X(value));
+        REG_WR(RTE_INB_FRM_DATA_CTRL_ACC, RTE_INB_FRM_DATA_CTRL_ACC_FRM_DATA_CTRL_ADDR(base));
+        REG_RD(RTE_INB_FRM_DATA_CTRL, &value);
+        DBG_PR_REG("FRM_DATA_CTRL", value);
+        DBG_PR_REG_M("FRM_TXING", RTE_INB_FRM_DATA_CTRL_FRM_TXING, value);
+        DBG_PR_REG_M("FRM_TX_CNT", RTE_INB_FRM_DATA_CTRL_FRM_TX_CNT, value);
+        DBG_PR_REG_M("FRM_UPDATING", RTE_INB_FRM_DATA_CTRL_FRM_UPDATING, value);
+        DBG_PR_REG_M("FRM_UPD_CNT", RTE_INB_FRM_DATA_CTRL_FRM_UPD_CNT, value);
         DBG_REG(REG_ADDR(RTE_INB_RTP_TIMER_CFG1(i)), "TIMER_CFG1:FIRST");
         DBG_REG(REG_ADDR(RTE_INB_RTP_TIMER_CFG2(i)), "TIMER_CFG2:DELTA");
         REG_RD(RTE_INB_RTP_CNT(i), &value);
@@ -670,6 +701,13 @@ int mera_ib_debug_print(struct mera_inst *inst,
                 DBG_PR_REG_M("EOF", RTE_INB_FRM_DATA_CP_MISC_EOF, value);
                 DBG_PR_REG_M("LAST_TX_CNT", RTE_INB_FRM_DATA_CP_MISC_LAST_FRM_TX_CNT, value);
                 DBG_PR_REG_M("STICKY_ENA", RTE_INB_FRM_DATA_CP_MISC_STATE_STICKY_ENA, value);
+                REG_RD(RTE_INB_FRM_DATA_CP_STICKY_BITS(k), &value);
+                DBG_PR_REG("CP_STICKY_BITS", value);
+                DBG_PR_REG_M("TXING_AT_START", RTE_INB_FRM_DATA_CP_STICKY_BITS_FRM_TXING_AT_START_STICKY, value);
+                DBG_PR_REG_M("TXING_AT_END", RTE_INB_FRM_DATA_CP_STICKY_BITS_FRM_TXING_AT_END_STICKY, value);
+                DBG_PR_REG_M("SAME_TX_CNT", RTE_INB_FRM_DATA_CP_STICKY_BITS_SAME_FRM_TX_CNT_STICKY, value);
+                DBG_PR_REG_M("UPDATING_ON_SOF", RTE_INB_FRM_DATA_CP_STICKY_BITS_FRM_UPDATING_ON_SOF_ERR_STICKY, value);
+                DBG_PR_REG_M("NOT_UPDATING_ON_EOF", RTE_INB_FRM_DATA_CP_STICKY_BITS_NOT_FRM_UPDATING_ON_EOF_ERR_STICKY, value);
                 pr("\n");
             }
             REG_RD(RTE_INB_RD_ACTION_ADDRS(j), &value);

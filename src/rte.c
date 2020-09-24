@@ -203,6 +203,30 @@ char *mera_addr_txt(char *buf, mera_addr_t *addr)
     return buf;
 }
 
+int mera_time_get(struct mera_inst *inst, const mera_time_t *time, mera_rte_time_t *rte)
+{
+    uint32_t value;
+
+    if (time->offset == 0 && time->interval == 0) {
+        // If offset and interval are both zero, it is a one-shot (test feature).
+        // In that case, FIRST is set to the current SC time to delay the frame.
+        REG_RD(RTE_SC_TIME, &value);
+        rte->first = RTE_SC_TIME_SC_RUT_CNT_X(value);
+    } else {
+        rte->first = MERA_RUT_TIME(time->offset);
+    }
+    rte->delta = MERA_RUT_TIME(time->interval);
+    return 0;
+}
+
+char *mera_time_txt(char *buf, mera_time_t *time)
+{
+    sprintf(buf, "%u.%03u usec at %u.%03u usec",
+            time->interval / 1000, time->interval % 1000,
+            time->offset / 1000, time->offset % 1000);
+    return buf;
+}
+
 int mera_poll(struct mera_inst *inst)
 {
     T_I("enter");

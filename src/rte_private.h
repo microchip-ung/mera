@@ -61,6 +61,21 @@ typedef struct {
 #define RTE_OB_DG_SEC_SIZE 1024
 #endif
 
+// Size of frame memory in 32-byte chunks
+#if defined(MERA_FPGA)
+#define RTE_IB_FRAME_MEM_SIZE 160
+#else
+#define RTE_IB_FRAME_MEM_SIZE 1603
+#endif
+
+// Maximum number of inbound DG (DATA_CP) entries in one RA
+#if defined(MERA_FPGA)
+#define RTE_IB_RA_DG_CNT 2
+#else
+#define RTE_IB_RA_DG_CNT 8
+#endif
+
+
 // Number of RTPs to poll every second to avoid multiple wrap arounds of 16-bit counters.
 // Minimum cycle time is 200 usec, giving 5000 pps, or 13 seconds to wrap.
 #define RTE_POLL_CNT   (RTE_RTP_CNT / 13)
@@ -171,6 +186,11 @@ struct mera_inst *mera_inst_get(struct mera_inst *inst);
 int mera_rtp_check(const mera_rtp_id_t rtp_id);
 void mera_cnt_16_update(uint16_t value, mera_counter_t *counter, int clear);
 
+typedef struct {
+    uint32_t first;
+    uint32_t delta;
+} mera_rte_time_t;
+
 int mera_ib_init(struct mera_inst *inst);
 int mera_ob_init(struct mera_inst *inst);
 int mera_ib_poll(struct mera_inst *inst);
@@ -178,6 +198,8 @@ int mera_ob_poll(struct mera_inst *inst);
 uint32_t mera_addr_get(const mera_addr_t *addr);
 uint32_t mera_addr_offset(const mera_addr_t *addr);
 char *mera_addr_txt(char *buf, mera_addr_t *addr);
+int mera_time_get(struct mera_inst *inst, const mera_time_t *time, mera_rte_time_t *rte);
+char *mera_time_txt(char *buf, mera_time_t *time);
 
 /* ================================================================= *
  *  Register access

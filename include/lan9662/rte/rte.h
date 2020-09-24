@@ -100,6 +100,12 @@ typedef struct {
     uint32_t addr; // Base address of requested buffer
 } mera_buf_t;
 
+// RTE time
+typedef struct {
+    uint32_t offset;   // Offset from cycle start [nsec]
+    uint32_t interval; // Interval between timeouts [nsec]
+} mera_time_t;
+
 /* - RTE Outbound -------------------------------------------------- */
 
 // RTP Outbound configuration
@@ -136,7 +142,7 @@ typedef struct {
     uint16_t        valid_offset;    // Offset after Ethernet Type to Profinet IOPS or OPC DataSetFlags1
     mera_bool_t     valid_chk;       // Profinet (IOPS bit 7) or OPC (DataSetFlags1 bit 0) valid check
     mera_bool_t     opc_seq_chk;     // OPC MessageSequenceNumber check
-    mera_bool_t     opc_code_chk;    // OPC StatusCode/Severity check (bit 30:31 must be zero)
+    mera_bool_t     opc_code_chk;    // OPC StatusCode/Severity check (must be zero)
     mera_bool_t     invalid_default; // Invalid data action: Write defaults (true) or last valid (false)
     uint8_t         data[MERA_DATA_GROUP_CNT]; // Default data
 } mera_ob_dg_conf_t;
@@ -165,7 +171,7 @@ int mera_ob_dg_status_get(struct mera_inst      *inst,
 
 // Outbound Write Action List configuration
 typedef struct {
-    uint32_t time; // Time [nsec]
+    mera_time_t time; // Timer control
 } mera_ob_wal_conf_t;
 
 // Get Outbound Write Action List configuration
@@ -236,7 +242,7 @@ typedef enum {
 typedef struct {
     mera_rtp_type_t    type;   // Type
     mera_rtp_ib_mode_t mode;   // Mode
-    uint32_t           time;   // Cycle time [nsec] (INJ mode)
+    mera_time_t        time;   // Cycle time (INJ mode)
     uint16_t           port;   // Egress chip port (INJ mode)
     uint16_t           length; // Frame length (excluding IFH and FCS)
     uint8_t            data[MERA_FRAME_DATA_CNT];   // Frame data
@@ -255,7 +261,7 @@ int mera_ib_rtp_conf_set(struct mera_inst         *inst,
 
 // Inbound Read Action List configuration
 typedef struct {
-    uint32_t time; // Time [nsec]
+    mera_time_t time; // Timer control
 } mera_ib_ral_conf_t;
 
 // Get Inbound Read Action List configuration
@@ -297,8 +303,11 @@ int mera_ib_ra_add(struct mera_inst        *inst,
 
 // Inbound Data Group configuration
 typedef struct {
-    mera_rtp_id_t rtp_id;     // Inbound RTP
-    uint16_t      pdu_offset; // PDU offset after Ethernet Type
+    mera_rtp_id_t   rtp_id;          // Inbound RTP
+    uint16_t        pdu_offset;      // PDU offset after Ethernet Type
+    uint16_t        valid_offset;    // Offset after Ethernet Type to Profinet IOPS or OPC DataSetFlags1
+    mera_bool_t     valid_update;    // Update Profinet (IOPS bit 7) or OPC (DataSetFlags1 bit 0)
+    mera_bool_t     opc_code_update; // OPC StatusCode/Severity update
 } mera_ib_dg_conf_t;
 
 // Initalize Inbound DG configuration

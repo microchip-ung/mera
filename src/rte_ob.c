@@ -319,16 +319,14 @@ int mera_ob_wal_conf_set(struct mera_inst         *inst,
                          const mera_ob_wal_id_t   wal_id,
                          const mera_ob_wal_conf_t *const conf)
 {
-    uint32_t value;
+    mera_rte_time_t time;
 
     MERA_RC(mera_wal_check(wal_id));
     inst = mera_inst_get(inst);
+    MERA_RC(mera_time_get(inst, &conf->time, &time));
     inst->ob.wal_tbl[wal_id].conf = *conf;
-    REG_RD(RTE_SC_TIME, &value);
-    value = (conf->time ? 0 : RTE_SC_TIME_SC_RUT_CNT_X(value));
-    REG_WR(RTE_OUTB_WR_TIMER_CFG1(wal_id), RTE_OUTB_WR_TIMER_CFG1_FIRST_RUT_CNT(value));
-    REG_WR(RTE_OUTB_WR_TIMER_CFG2(wal_id),
-           RTE_OUTB_WR_TIMER_CFG2_DELTA_RUT_CNT(MERA_RUT_TIME(conf->time)));
+    REG_WR(RTE_OUTB_WR_TIMER_CFG1(wal_id), RTE_OUTB_WR_TIMER_CFG1_FIRST_RUT_CNT(time.first));
+    REG_WR(RTE_OUTB_WR_TIMER_CFG2(wal_id), RTE_OUTB_WR_TIMER_CFG2_DELTA_RUT_CNT(time.delta));
     REG_WR(RTE_OUTB_TIMER_CMD,
            RTE_OUTB_TIMER_CMD_TIMER_CMD(2) |
            RTE_OUTB_TIMER_CMD_TIMER_RSLT(0) |
@@ -610,7 +608,7 @@ int mera_ob_debug_print(struct mera_inst *inst,
     const char             *txt;
     uint32_t               value, len, pos, idx, i, j, addr = ob->dg_addr;
     mera_bool_t            internal;
-    char                   buf[32];
+    char                   buf[64];
     struct {
         uint32_t cnt;
         uint32_t addr[3];
@@ -655,7 +653,7 @@ int mera_ob_debug_print(struct mera_inst *inst,
             dg = &ob->dg_tbl[addr];
             dc = &dg->conf;
             if (addr == rtp->addr) {
-                pr("\n  Addr  DG ID  PDU   DG_Addr  Length  Val_Chk  Val_Off  Seq_Chk  Code_Chk  Inv_def\n");
+                pr("\n  Addr  DG ID  PDU   DG_Addr  Length  Vld_Chk  Vld_Off  Seq_Chk  Code_Chk  Inv_def\n");
             }
             pr("  %-6u%-7u%-6u%-9u%-8u%-9u%-9u%-9u%-9u%-9u\n",
                addr, dc->dg_id, dc->pdu_offset, dg->dg_addr, dc->length, dc->valid_chk,
@@ -671,7 +669,7 @@ int mera_ob_debug_print(struct mera_inst *inst,
             continue;
         }
         pr("WAL ID: %u\n", i);
-        pr("Time  : %u.%03u usec\n", wal->conf.time / 1000, wal->conf.time % 1000);
+        pr("Time  : %s\n", mera_time_txt(buf, &wal->conf.time));
         for ( ; addr != 0; addr = wa->addr) {
             wa = &ob->wa_tbl[addr];
             wc = &wa->conf;
