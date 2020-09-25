@@ -101,7 +101,7 @@ int mera_ib_rtp_conf_set(struct mera_inst         *inst,
 
     // Frame data
     for (i = 0; i < cnt; i++, addr++) {
-        REG_WR(RTE_INB_FRM_DATA_CHG_ADDR, addr);
+        REG_WR(RTE_INB_FRM_DATA_CHG_ADDR, RTE_INB_FRM_DATA_CHG_ADDR_FRM_DATA_CHG_ADDR(addr));
         REG_WR(RTE_INB_FRM_DATA_ADDR, RTE_INB_FRM_DATA_ADDR_FRM_DATA_ADDR(addr));
         REG_WR(RTE_INB_FRM_DATA_WR_MASK, 0xffffffff);
         chg = 0;
@@ -307,6 +307,14 @@ int mera_ib_dg_add(struct mera_inst        *inst,
         return -1;
     }
 
+    // Check valid_offset
+    opc = (rtp->conf.type == MERA_RTP_TYPE_OPC_UA ? 1 : 0);
+    if (conf->valid_offset == 0 &&
+        (conf->valid_update || (opc && (conf->opc_seq_update || conf->opc_code_update)))) {
+        T_E("valid_offset must be non-zero when update enabled");
+        return -1;
+    }
+
     // Find RA
     ra_addr = ib->ral_tbl[ral_id].addr;
     while (ra_addr != 0) {
@@ -354,7 +362,13 @@ int mera_ib_dg_add(struct mera_inst        *inst,
     REG_WR(RTE_INB_FRM_DATA_BYTE_ADDR2(addr),
            RTE_INB_FRM_DATA_BYTE_ADDR2_DG_STATUS_FRM_DATA_BYTE_ADDR(frm_addr + conf->valid_offset + 3));
 
-    opc = (rtp->conf.type == MERA_RTP_TYPE_OPC_UA ? 1 : 0);
+    if (opc && conf->opc_seq_update) {
+        // Update OPC sequence number offset
+        frm_addr += (conf->valid_offset + 1);
+        REG_WR(RTE_INB_FRM_DATA_CHG_ADDR, RTE_INB_FRM_DATA_CHG_ADDR_FRM_DATA_CHG_ADDR(frm_addr / 32));
+        REG_WRM_SET(RTE_INB_FRM_DATA_OPC_DG_SEQ_NUM_BYTE_POS, 1 << (frm_addr % 32));
+    }
+
     valid_mode = (conf->valid_update == 0 ? 0 : opc ? 2 : 1);
     status_mode = (conf->opc_code_update && opc ? 2 : 0);
     REG_WR(RTE_INB_FRM_DATA_CP_MISC(addr),
@@ -451,6 +465,9 @@ int mera_ib_poll(struct mera_inst *inst)
     return 0;
 }
 
+// Number of entries in local sequence number offset table
+#define RTE_IB_SEQ_CNT 32
+
 int mera_ib_debug_print(struct mera_inst *inst,
                         const mera_debug_printf_t pr,
                         const mera_debug_info_t   *const info)
@@ -464,8 +481,12 @@ int mera_ib_debug_print(struct mera_inst *inst,
     mera_ib_dg_entry_t     *dg;
     mera_ib_dg_conf_t      *dc;
     const char             *txt;
-    uint32_t               i, j, k, m, value, chg, base, addr, len;
+    uint32_t               i, j, k, m, n, value, seq, chg, base, addr, len;
     char                   buf[64];
+    struct {
+        uint16_t cnt;
+        uint16_t val[RTE_IB_SEQ_CNT];
+    } seq_table;
 
     mera_debug_print_header(pr, "RTE Inbound State");
     pr("Next RTP ID    : %u\n", ib->rtp_id);
@@ -531,10 +552,10 @@ int mera_ib_debug_print(struct mera_inst *inst,
                 dg = &ib->dg_tbl[addr];
                 dc = &dg->conf;
                 if (addr == ra->dg_addr) {
-                    pr("\n    Addr  RTP  PDU   Vld_Off  Vld_Upd  Code_Upd\n");
+                    pr("\n    Addr  RTP  PDU   Vld_Off  Vld_Upd  Seq_Upd  Code_Upd\n");
                 }
-                pr("    %-6u%-5u%-6u%-9u%-9u%u\n", addr, dc->rtp_id,
-                   dc->pdu_offset, dc->valid_offset, dc->valid_update, dc->opc_code_update);
+                pr("    %-6u%-5u%-6u%-9u%-9u%-9u%u\n", addr, dc->rtp_id,
+                   dc->pdu_offset, dc->valid_offset, dc->valid_update, dc->opc_seq_update, dc->opc_code_update);
             }
         }
         pr("\n");
@@ -604,23 +625,33 @@ int mera_ib_debug_print(struct mera_inst *inst,
         if (len) {
             pr("IFH:  223  192-191  160-159  128-127   96-95    64-63    32-31     0\n");
         }
+        seq_table.cnt = 0;
         for (j = 0; j < len; j += 32) {
             addr = (base + j / 32);
             REG_WR(RTE_INB_FRM_DATA_ADDR, RTE_INB_FRM_DATA_ADDR_FRM_DATA_ADDR(addr));
             REG_WR(RTE_INB_FRM_DATA_CHG_ADDR, addr);
             REG_RD(RTE_INB_FRM_DATA_CHG_BYTE, &chg);
+            REG_RD(RTE_INB_FRM_DATA_OPC_DG_SEQ_NUM_BYTE_POS, &seq);
             pr("%04x: ", addr);
             for (k = 0; k < 8; k++) {
                 REG_RD(RTE_INB_FRM_DATA(0, k), &value);
                 for (m = 0; m < 4; m++) {
-                    if (chg & (1 << (m + k * 4))) {
+                    n = (m + k * 4);
+                    if (chg & (1 << n)) {
                         pr("%02x", (value >> (24 - m * 8)) & 0xff);
                     } else {
                         pr("xx");
                     }
+                    if ((seq & (1 << n)) && seq_table.cnt < RTE_IB_SEQ_CNT) {
+                        // Save sequence number offset from frame base
+                        seq_table.val[seq_table.cnt++] = (j + n);
+                    }
                 }
                 pr(k == 7 ? "\n" : "-");
             }
+        }
+        for (j = 0; j < seq_table.cnt; j++) {
+            pr("%sSeq_Offs_%-2u: %u\n", j == 0 ? "\n" : "", j, seq_table.val[j]);
         }
         if (len) {
             pr("\n");

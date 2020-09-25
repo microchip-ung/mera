@@ -212,6 +212,9 @@ int mera_time_get(struct mera_inst *inst, const mera_time_t *time, mera_rte_time
         // In that case, FIRST is set to the current SC time to delay the frame.
         REG_RD(RTE_SC_TIME, &value);
         rte->first = RTE_SC_TIME_SC_RUT_CNT_X(value);
+    } else if (time->offset >= MERA_TIME_OFFSET_NONE) {
+        // Offset disabled using all-ones
+        rte->first = 0xffffffff;
     } else {
         rte->first = MERA_RUT_TIME(time->offset);
     }

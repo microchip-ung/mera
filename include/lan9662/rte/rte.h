@@ -100,6 +100,9 @@ typedef struct {
     uint32_t addr; // Base address of requested buffer
 } mera_buf_t;
 
+// RTE time offset can be disbled using this value
+#define MERA_TIME_OFFSET_NONE 1000000000
+
 // RTE time
 typedef struct {
     uint32_t offset;   // Offset from cycle start [nsec]
@@ -307,6 +310,7 @@ typedef struct {
     uint16_t        pdu_offset;      // PDU offset after Ethernet Type
     uint16_t        valid_offset;    // Offset after Ethernet Type to Profinet IOPS or OPC DataSetFlags1
     mera_bool_t     valid_update;    // Update Profinet (IOPS bit 7) or OPC (DataSetFlags1 bit 0)
+    mera_bool_t     opc_seq_update;  // OPC MessageSequenceNumber update
     mera_bool_t     opc_code_update; // OPC StatusCode/Severity update
 } mera_ib_dg_conf_t;
 
