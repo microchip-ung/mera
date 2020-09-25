@@ -465,9 +465,6 @@ int mera_ib_poll(struct mera_inst *inst)
     return 0;
 }
 
-// Number of entries in local sequence number offset table
-#define RTE_IB_SEQ_CNT 32
-
 int mera_ib_debug_print(struct mera_inst *inst,
                         const mera_debug_printf_t pr,
                         const mera_debug_info_t   *const info)
@@ -481,12 +478,8 @@ int mera_ib_debug_print(struct mera_inst *inst,
     mera_ib_dg_entry_t     *dg;
     mera_ib_dg_conf_t      *dc;
     const char             *txt;
-    uint32_t               i, j, k, m, n, value, seq, chg, base, addr, len;
+    uint32_t               i, j, k, m, n, value, seq, seq_flag, chg, base, addr, len;
     char                   buf[64];
-    struct {
-        uint16_t cnt;
-        uint16_t val[RTE_IB_SEQ_CNT];
-    } seq_table;
 
     mera_debug_print_header(pr, "RTE Inbound State");
     pr("Next RTP ID    : %u\n", ib->rtp_id);
@@ -625,8 +618,7 @@ int mera_ib_debug_print(struct mera_inst *inst,
         if (len) {
             pr("IFH:  223  192-191  160-159  128-127   96-95    64-63    32-31     0\n");
         }
-        seq_table.cnt = 0;
-        for (j = 0; j < len; j += 32) {
+        for (j = 0, seq_flag = 0; j < len; j += 32) {
             addr = (base + j / 32);
             REG_WR(RTE_INB_FRM_DATA_ADDR, RTE_INB_FRM_DATA_ADDR_FRM_DATA_ADDR(addr));
             REG_WR(RTE_INB_FRM_DATA_CHG_ADDR, addr);
@@ -637,21 +629,17 @@ int mera_ib_debug_print(struct mera_inst *inst,
                 REG_RD(RTE_INB_FRM_DATA(0, k), &value);
                 for (m = 0; m < 4; m++) {
                     n = (m + k * 4);
-                    if (chg & (1 << n)) {
+                    if (seq_flag || (seq & (1 << n))) {
+                        pr("SQ");
+                        seq_flag = !seq_flag;
+                    } else if (chg & (1 << n)) {
                         pr("%02x", (value >> (24 - m * 8)) & 0xff);
                     } else {
                         pr("xx");
                     }
-                    if ((seq & (1 << n)) && seq_table.cnt < RTE_IB_SEQ_CNT) {
-                        // Save sequence number offset from frame base
-                        seq_table.val[seq_table.cnt++] = (j + n);
-                    }
                 }
                 pr(k == 7 ? "\n" : "-");
             }
-        }
-        for (j = 0; j < seq_table.cnt; j++) {
-            pr("%sSeq_Offs_%-2u: %u\n", j == 0 ? "\n" : "", j, seq_table.val[j]);
         }
         if (len) {
             pr("\n");
