@@ -9,7 +9,7 @@
 extern "C" {
 #endif
 
-#include "lan9662/rte.h"
+#include "microchip/ethernet/rte/api.h"
 
 typedef enum {
     MSCC_INIT_CMD_REG,       // Register trace and startup options

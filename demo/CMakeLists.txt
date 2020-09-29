@@ -10,7 +10,7 @@ endif()
 add_library(rte-json-c SHARED IMPORTED GLOBAL) # GLOBAL -> if outside src tree
 set_property(TARGET rte-json-c PROPERTY IMPORTED_LOCATION ${JSON_LIB})
 
-set(RPC_HDRS ${CMAKE_CURRENT_SOURCE_DIR}/../include/lan9662/rte/rte.h)
+set(RPC_HDRS ${CMAKE_CURRENT_SOURCE_DIR}/../include/microchip/ethernet/rte/api/main.h)
 
 add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/rpc-ag/mera-rpc.h ${CMAKE_CURRENT_BINARY_DIR}/rpc-ag/mera-rpc.c
                    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../scripts/rpc-gen.rb -b ${CMAKE_CURRENT_SOURCE_DIR}/.. -o ${CMAKE_CURRENT_BINARY_DIR}/rpc-ag ${RPC_HDRS}

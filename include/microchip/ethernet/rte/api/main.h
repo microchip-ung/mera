@@ -1,8 +1,8 @@
 // Copyright (c) 2020 Microchip Technology Inc. and its subsidiaries.
 // SPDX-License-Identifier: MIT
 
-#ifndef _MERA_RTE_H_
-#define _MERA_RTE_H_
+#ifndef _MICROCHIP_ETHERNET_RTE_API_MAIN_H_
+#define _MICROCHIP_ETHERNET_RTE_API_MAIN_H_
 
 #include <stdint.h>
 #include <stdarg.h>
@@ -459,4 +459,4 @@ int mera_debug_info_print(struct mera_inst          *inst,
                           const mera_debug_printf_t pr,
                           const mera_debug_info_t   *const info);
 
-#endif // _MERA_RTE_H_
+#endif // _MICROCHIP_ETHERNET_RTE_API_MAIN_H_

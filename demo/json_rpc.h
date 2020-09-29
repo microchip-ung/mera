@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <json-c/json.h>
-#include "lan9662/rte.h"
+#include "microchip/ethernet/rte/api.h"
 
 typedef struct {
     int         idx;

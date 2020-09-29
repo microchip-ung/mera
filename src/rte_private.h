@@ -7,7 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <lan9662/rte.h>
+#include "microchip/ethernet/rte/api.h"
 
 #define VTSS_BIT(x)                   (1U << (x))
 #define VTSS_BITMASK(x)               ((1U << (x)) - 1)
@@ -209,15 +209,16 @@ int mera_rd(struct mera_inst *inst, uint32_t addr, uint32_t *val);
 int mera_wrm(struct mera_inst *inst, uint32_t reg, uint32_t val, uint32_t mask);
 void mera_reg_error(const char *file, int line);
 
-inline uint32_t mera_target_id_to_addr(int target_id)
+static inline uint32_t mera_target_id_to_addr(int target_id)
 {
     return (target_id == TARGET_GCB ? LAN966X_TARGET_GCB_OFFSET :
             target_id == TARGET_RTE ? LAN966X_TARGET_RTE_OFFSET : 0xffffffff);
 }
 
-inline uint32_t __ioreg(const char *file, int line, int tbaseid, int tinst, int tcnt,
-                        int gbase, int ginst, int gcnt, int gwidth,
-                        int raddr, int rinst, int rcnt, int rwidth)
+static inline uint32_t __ioreg(const char *file, int line,
+                               int tbaseid, int tinst, int tcnt,
+                               int gbase, int ginst, int gcnt, int gwidth,
+                               int raddr, int rinst, int rcnt, int rwidth)
 {
     uint32_t addr = mera_target_id_to_addr(tbaseid + tinst);
 

@@ -4,6 +4,6 @@
 #ifndef _MERA_H_
 #define _MERA_H_
 
-#include <lan9662/rte/rte.h>
+#include <microchip/ethernet/rte/api/main.h>
 
 #endif // _MERA_H_
