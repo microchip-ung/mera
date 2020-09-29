@@ -1,0 +1,25 @@
+---
+conf:
+    rel_name: "MERA-99.99"
+
+pages:
+    - name: "README"
+      src:  "docs/readme.adoc"
+
+    - name: "Release notes"
+      pages:
+        - name: "MERA-2021.09"
+          src:  "docs/release-notes/mera-2021.09.adoc"
+
+    - name: "Introduction"
+      src:  "docs/introduction.adoc"
+
+    - name: "MERA API Reference"
+      pages:
+        - src:  "include/microchip/ethernet/rte/api/main.h"
+
+    - name: "Licenses"
+      src:  "docs/licenses.adoc"
+
+...
+

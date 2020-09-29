@@ -1,0 +1,7 @@
+= License
+
+== License
+
+The MESA packet is licensed under the MIT license. See the `LICENSE` file for
+details.
+
