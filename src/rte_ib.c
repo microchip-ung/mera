@@ -28,6 +28,8 @@ int mera_ib_rtp_conf_get(struct mera_inst    *inst,
 
 #define IFH_LEN 28
 
+#define RTP_FRAME_LENGTH(len) (len < 60 ? 60 : len)
+
 int mera_ib_rtp_conf_set(struct mera_inst         *inst,
                          const mera_rtp_id_t      rtp_id,
                          const mera_ib_rtp_conf_t *const conf)
@@ -37,7 +39,7 @@ int mera_ib_rtp_conf_set(struct mera_inst         *inst,
     mera_rte_time_t     time;
     uint32_t            type = (conf->type == MERA_RTP_TYPE_OPC_UA ? 1 : 0);
     uint32_t            ena = (conf->type == MERA_RTP_TYPE_DISABLED ? 0 : 1);
-    uint32_t            len = (conf->length < 60 ? 60 : conf->length);
+    uint32_t            len = RTP_FRAME_LENGTH(conf->length);
     uint32_t            inj = (conf->mode == MERA_RTP_IB_MODE_INJ ? 1 : 0);
     uint32_t            i, j, k, m, addr, value, len_old, cnt, chg;
 
@@ -115,7 +117,7 @@ int mera_ib_rtp_conf_set(struct mera_inst         *inst,
                     if (k < conf->length) {
                         value += conf->data[k];
                         if (inj || conf->update[k]) {
-                             chg |= (1 << (j * 4 + m));
+                             chg |= VTSS_BIT(j * 4 + m);
                         }
                     }
                 }
@@ -128,7 +130,40 @@ int mera_ib_rtp_conf_set(struct mera_inst         *inst,
     return 0;
 }
 
-static int mera_ral_check(const mera_ib_ral_id_t ral_id)
+int mera_ib_rtp_data_set(struct mera_inst         *inst,
+                         const mera_rtp_id_t      rtp_id,
+                         const mera_ib_rtp_data_t *const data)
+{
+    mera_ib_t           *ib;
+    mera_ib_rtp_entry_t *rtp;
+    uint32_t            addr, value;
+    uint16_t            offs, len;
+
+    inst = mera_inst_get(inst);
+    ib = &inst->ib;
+    MERA_RC(mera_rtp_check(rtp_id));
+    rtp = &ib->rtp_tbl[rtp_id];
+    if (rtp->conf.type == MERA_RTP_TYPE_DISABLED) {
+        T_E("rtp_id %u is disabled", rtp_id);
+        return -1;
+    }
+    offs = data->offset;
+    len = RTP_FRAME_LENGTH(rtp->conf.length);
+    if (offs >= len) {
+        T_E("offset %u exceeds length %u", offs, len);
+        return -1;
+    }
+    offs += IFH_LEN;
+    addr = (rtp->frm_data_addr + (offs / 32));
+    REG_WR(RTE_INB_FRM_DATA_ADDR, RTE_INB_FRM_DATA_ADDR_FRM_DATA_ADDR(addr));
+    offs %= 32;
+    REG_WR(RTE_INB_FRM_DATA_WR_MASK, VTSS_BIT(offs));
+    value = (data->value << (8 * (3 - offs % 4)));
+    REG_WR(RTE_INB_FRM_DATA(0, offs / 4), value);
+    return 0;
+}
+
+int mera_ral_check(const mera_ib_ral_id_t ral_id)
 {
     if (ral_id >= MERA_IB_RAL_CNT) {
         T_E("illegal ral_id: %u", ral_id);
@@ -279,6 +314,41 @@ int mera_ib_ra_add(struct mera_inst        *inst,
     return 0;
 }
 
+int mera_ib_ra_ctrl_set(struct mera_inst        *inst,
+                        const mera_ib_ral_id_t  ral_id,
+                        const mera_ib_ra_id_t   ra_id,
+                        const mera_ib_ra_ctrl_t *const ctrl)
+{
+    mera_ib_t          *ib;
+    mera_ib_ra_entry_t *ra;
+    uint16_t           addr;
+
+    MERA_RC(mera_ral_check(ral_id));
+    inst = mera_inst_get(inst);
+    ib = &inst->ib;
+
+    // Lookup RA
+    for (addr = ib->ral_tbl[ral_id].addr; addr != 0; addr = ra->addr) {
+        ra = &ib->ra_tbl[addr];
+        if (ra->conf.ra_id == ra_id) {
+            break;
+        }
+    }
+    if (addr == 0) {
+        T_E("ral_id %u, ra_id %u not found", ral_id, ra_id);
+        return -1;
+    }
+    if (ra->conf.rd_addr.intf == MERA_IO_INTF_SRAM) {
+        T_E("operation not supported for SRAM");
+        return -1;
+    }
+    ra->disabled = (ctrl->enable ? 0 : 1);
+    REG_WRM(RTE_INB_RD_ACTION_MISC(addr),
+            RTE_INB_RD_ACTION_MISC_DG_DATA_LEN(ctrl->enable ? ra->conf.length : 0),
+            RTE_INB_RD_ACTION_MISC_DG_DATA_LEN_M);
+    return 0;
+}
+
 int mera_ib_dg_init(mera_ib_dg_conf_t *const conf)
 {
     memset(conf, 0, sizeof(*conf));
@@ -366,7 +436,7 @@ int mera_ib_dg_add(struct mera_inst        *inst,
         // Update OPC sequence number offset
         frm_addr += (conf->valid_offset + 1);
         REG_WR(RTE_INB_FRM_DATA_CHG_ADDR, RTE_INB_FRM_DATA_CHG_ADDR_FRM_DATA_CHG_ADDR(frm_addr / 32));
-        REG_WRM_SET(RTE_INB_FRM_DATA_OPC_DG_SEQ_NUM_BYTE_POS, 1 << (frm_addr % 32));
+        REG_WRM_SET(RTE_INB_FRM_DATA_OPC_DG_SEQ_NUM_BYTE_POS, VTSS_BIT(frm_addr % 32));
     }
 
     valid_mode = (conf->valid_update == 0 ? 0 : opc ? 2 : 1);
@@ -538,9 +608,10 @@ int mera_ib_debug_print(struct mera_inst *inst,
         pr("Time  : %s\n", mera_time_txt(buf, &ral->conf.time));
         for ( ; addr != 0; addr = ra->addr) {
             ra = &ib->ra_tbl[addr];
-            pr("\n  Addr  RA ID  RD Addr            Length  DG_CNT\n");
-            pr("  %-6u%-7u%-19s%-8u%u\n",
-               addr, ra->conf.ra_id, mera_addr_txt(buf, &ra->conf.rd_addr), ra->conf.length, ra->dg_cnt);
+            pr("\n  Addr  RA ID  Dis  RD Addr            Length  DG_CNT\n");
+            pr("  %-6u%-7u%-5u%-19s%-8u%u\n",
+               addr, ra->conf.ra_id, ra->disabled ? 1 : 0,
+               mera_addr_txt(buf, &ra->conf.rd_addr), ra->conf.length, ra->dg_cnt);
             for (addr = ra->dg_addr; addr != 0; addr = dg->addr) {
                 dg = &ib->dg_tbl[addr];
                 dc = &dg->conf;
@@ -629,10 +700,10 @@ int mera_ib_debug_print(struct mera_inst *inst,
                 REG_RD(RTE_INB_FRM_DATA(0, k), &value);
                 for (m = 0; m < 4; m++) {
                     n = (m + k * 4);
-                    if (seq_flag || (seq & (1 << n))) {
+                    if (seq_flag || (seq & VTSS_BIT(n))) {
                         pr("SQ");
                         seq_flag = !seq_flag;
-                    } else if (chg & (1 << n)) {
+                    } else if (chg & VTSS_BIT(n)) {
                         pr("%02x", (value >> (24 - m * 8)) & 0xff);
                     } else {
                         pr("xx");

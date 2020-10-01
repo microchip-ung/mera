@@ -101,10 +101,11 @@ typedef struct {
 
 // DG entry
 typedef struct {
-    mera_ob_dg_conf_t conf;    // Configuration
-    mera_rtp_id_t     rtp_id;  // Zero indicates free entry
-    uint16_t          addr;    // Next address
-    uint16_t          dg_addr; // Allocated DG address
+    mera_ob_dg_conf_t conf;     // Configuration
+    mera_rtp_id_t     rtp_id;   // Zero indicates free entry
+    uint16_t          addr;     // Next address
+    uint16_t          dg_addr;  // Allocated DG address
+    mera_bool_t       disabled; // Disabled via control API
 } mera_ob_dg_entry_t;
 
 // WAL entry
@@ -150,11 +151,12 @@ typedef struct {
 
 // RA entry
 typedef struct {
-    mera_bool_t       used;    // Used indication
-    uint16_t          addr;    // Next RA address
-    uint16_t          dg_addr; // First DG address
-    uint16_t          dg_cnt;  // Number of DG entries
-    mera_ib_ra_conf_t conf;    // Configuration
+    mera_bool_t       used;     // Used indication
+    uint16_t          addr;     // Next RA address
+    uint16_t          dg_addr;  // First DG address
+    uint16_t          dg_cnt;   // Number of DG entries
+    mera_ib_ra_conf_t conf;     // Configuration
+    mera_bool_t       disabled; // Disabled via control API
 } mera_ib_ra_entry_t;
 
 // DG entry

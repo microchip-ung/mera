@@ -158,6 +158,29 @@ int mera_ob_dg_add(struct mera_inst        *inst,
                    const mera_rtp_id_t     rtp_id,
                    const mera_ob_dg_conf_t *const conf);
 
+// Outbound DG control
+typedef struct {
+    mera_bool_t enable; // Enable/disable copy of data to DG memory
+} mera_ob_dg_ctrl_t;
+
+// Set Outbound DG control
+int mera_ob_dg_ctrl_set(struct mera_inst        *inst,
+                        const mera_rtp_id_t     rtp_id,
+                        const mera_ob_dg_id_t   dg_id,
+                        const mera_ob_dg_ctrl_t *const ctrl);
+
+// Outbound DG data
+typedef struct {
+    uint16_t offset; // Offset in allocated DG memory block
+    uint8_t  value;  // Data value to write
+} mera_ob_dg_data_t;
+
+// Outbound DG data write
+int mera_ob_dg_data_set(struct mera_inst        *inst,
+                        const mera_rtp_id_t     rtp_id,
+                        const mera_ob_dg_id_t   dg_id,
+                        const mera_ob_dg_data_t *const data);
+
 // Outbound DG status
 typedef struct {
     mera_bool_t valid_chk;    // Valid check failed
@@ -252,15 +275,26 @@ typedef struct {
     uint8_t            update[MERA_FRAME_DATA_CNT]; // Frame update, if non-zero (OTF mode)
 } mera_ib_rtp_conf_t;
 
-// Get RTP Outbound configuration
+// Get RTP Inbound configuration
 int mera_ib_rtp_conf_get(struct mera_inst    *inst,
                          const mera_rtp_id_t rtp_id,
                          mera_ib_rtp_conf_t  *const conf);
 
-// Set RTP Outbound configuration
+// Set RTP Inbound configuration
 int mera_ib_rtp_conf_set(struct mera_inst         *inst,
                          const mera_rtp_id_t      rtp_id,
                          const mera_ib_rtp_conf_t *const conf);
+
+// RTP Inbound data
+typedef struct {
+    uint16_t offset; // Offset in allocated frame memory block
+    uint8_t  value;  // Data value to write
+} mera_ib_rtp_data_t;
+
+// RTP Inbound data write
+int mera_ib_rtp_data_set(struct mera_inst         *inst,
+                         const mera_rtp_id_t      rtp_id,
+                         const mera_ib_rtp_data_t *const data);
 
 // Inbound Read Action List configuration
 typedef struct {
@@ -303,6 +337,16 @@ int mera_ib_ra_init(mera_ib_ra_conf_t *const conf);
 int mera_ib_ra_add(struct mera_inst        *inst,
                    const mera_ib_ral_id_t  ral_id,
                    const mera_ib_ra_conf_t *const conf);
+
+// Read Action control
+typedef struct {
+    mera_bool_t enable; // Enable/disable copy of data to frame memory
+} mera_ib_ra_ctrl_t;
+
+int mera_ib_ra_ctrl_set(struct mera_inst        *inst,
+                        const mera_ib_ral_id_t  ral_id,
+                        const mera_ib_ra_id_t   ra_id,
+                        const mera_ib_ra_ctrl_t *const ctrl);
 
 // Inbound Data Group configuration
 typedef struct {

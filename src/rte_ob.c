@@ -4,13 +4,17 @@
 #define MERA_TRACE_GROUP MERA_TRACE_GROUP_OB
 #include "rte_private.h"
 
+// The first DG word is reserved for garbage
+#define RTE_OB_DG_BASE 1
+
 // Profinet DataStatus value/mask
 #define RTE_OB_PN_DS_MASK 0xb7
 #define RTE_OB_PN_DS_VAL  0x35
 
 int mera_ob_init(struct mera_inst *inst)
 {
-    uint32_t i;
+    mera_ob_t *ob;
+    uint32_t  i;
 
     T_I("enter");
 
@@ -40,9 +44,12 @@ int mera_ob_init(struct mera_inst *inst)
            RTE_OUTB_OPC_DG_MASKS_OPC_STATUS_CODE_MASK(0xc000) |   // StatusCode bit 14:15 is Severity
            RTE_OUTB_OPC_DG_MASKS_OPC_DATA_SET_FLAGS1_MASK(0x01)); // DataSetFlagss bit 1 is DataValid
 
+    ob = &inst->ob;
+    ob->dg_addr = RTE_OB_DG_BASE;
+
     // Profinet DataStatus default
     for (i = 1; i < RTE_OB_RTP_CNT; i++) {
-        inst->ob.rtp_tbl[i].conf.pn_ds = RTE_OB_PN_DS_VAL;
+        ob->rtp_tbl[i].conf.pn_ds = RTE_OB_PN_DS_VAL;
     }
 
     return 0;
@@ -244,32 +251,100 @@ int mera_ob_dg_add(struct mera_inst        *inst,
     return 0;
 }
 
-int mera_ob_dg_status_get(struct mera_inst      *inst,
-                          const mera_rtp_id_t   rtp_id,
-                          const mera_ob_dg_id_t dg_id,
-                          mera_ob_dg_status_t   *const status)
+static uint16_t mera_ob_dg_lookup(mera_ob_t             *ob,
+                                  const mera_rtp_id_t   rtp_id,
+                                  const mera_ob_dg_id_t dg_id)
 {
-    mera_ob_t           *ob;
-    mera_ob_rtp_entry_t *rtp;
-    mera_ob_dg_entry_t  *dg;
-    uint32_t            sticky, pn, opc;
-    uint16_t            addr;
+    uint16_t           addr;
+    mera_ob_dg_entry_t *dg;
+
+    for (addr = ob->rtp_tbl[rtp_id].addr; addr != 0; ) {
+        dg = &ob->dg_tbl[addr];
+        if (dg->conf.dg_id == dg_id) {
+            return addr;
+        }
+        addr = dg->addr;
+    }
+    T_E("rtp_id %u, dg_id %u not found", rtp_id, dg_id);
+    return addr;
+}
+
+int mera_ob_dg_ctrl_set(struct mera_inst        *inst,
+                        const mera_rtp_id_t     rtp_id,
+                        const mera_ob_dg_id_t   dg_id,
+                        const mera_ob_dg_ctrl_t *const ctrl)
+{
+    mera_ob_t          *ob;
+    mera_ob_dg_entry_t *dg;
+    uint16_t           addr;
+    mera_bool_t        ena = ctrl->enable;
 
     T_I("enter");
     MERA_RC(mera_rtp_check(rtp_id));
     inst = mera_inst_get(inst);
     ob = &inst->ob;
-    rtp = &ob->rtp_tbl[rtp_id];
-    for (addr = rtp->addr; addr != 0; ) {
-        dg = &ob->dg_tbl[addr];
-        if (dg->conf.dg_id == dg_id) {
-            // ID found
-            break;
-        }
-        addr = dg->addr;
+    if ((addr = mera_ob_dg_lookup(ob, rtp_id, dg_id)) == 0) {
+        return -1;
     }
-    if (addr == 0) {
-        T_E("rtp_id %u, dg_id %u not found", rtp_id, dg_id);
+
+    // If DG is disabled, one byte is copied to reserved address zero
+    dg = &ob->dg_tbl[addr];
+    dg->disabled = (ena ? 0 : 1);
+    REG_WR(RTE_OUTB_DG_DATA_SECTION_ADDR(addr),
+           RTE_OUTB_DG_DATA_SECTION_ADDR_DG_DATA_SECTION_ADDR(ena ? dg->dg_addr : 0) |
+           RTE_OUTB_DG_DATA_SECTION_ADDR_DG_DATA_LEN(ena ? dg->conf.length : 1));
+    return 0;
+}
+
+int mera_ob_dg_data_set(struct mera_inst        *inst,
+                        const mera_rtp_id_t     rtp_id,
+                        const mera_ob_dg_id_t   dg_id,
+                        const mera_ob_dg_data_t *const data)
+{
+    mera_ob_t          *ob;
+    mera_ob_dg_entry_t *dg;
+    uint32_t           value, mask;
+    uint16_t           addr, i, n;
+
+    T_I("enter");
+    MERA_RC(mera_rtp_check(rtp_id));
+    inst = mera_inst_get(inst);
+    ob = &inst->ob;
+    if ((addr = mera_ob_dg_lookup(ob, rtp_id, dg_id)) == 0) {
+        return -1;
+    }
+    dg = &ob->dg_tbl[addr];
+    if (data->offset >= dg->conf.length) {
+        T_E("offset %u exceeds length %u", data->offset, dg->conf.length);
+        return -1;
+    }
+    addr = (dg->dg_addr + (data->offset / 4));
+    n = (8 * (3 - (data->offset % 4)));
+    value = (data->value << n);
+    mask = (0xff << n);
+    for (i = 0; i < 2; i++, addr += RTE_OB_DG_SEC_SIZE) {
+        REG_WR(RTE_OUTB_DG_DATA_ADDR, addr);
+        REG_WRM(RTE_OUTB_DG_DATA, value, mask);
+        REG_WR(RTE_OUTB_DG_DATA_VLD_ACC, RTE_OUTB_DG_DATA_VLD_ACC_DG_DATA_VLD_ADDR(addr / 32));
+        REG_WR(RTE_OUTB_DG_DATA_VLD_SET, VTSS_BIT(addr % 32));
+    }
+    return 0;
+}
+
+int mera_ob_dg_status_get(struct mera_inst      *inst,
+                          const mera_rtp_id_t   rtp_id,
+                          const mera_ob_dg_id_t dg_id,
+                          mera_ob_dg_status_t   *const status)
+{
+    mera_ob_t *ob;
+    uint32_t  sticky, pn, opc;
+    uint16_t  addr;
+
+    T_I("enter");
+    MERA_RC(mera_rtp_check(rtp_id));
+    inst = mera_inst_get(inst);
+    ob = &inst->ob;
+    if ((addr = mera_ob_dg_lookup(ob, rtp_id, dg_id)) == 0) {
         return -1;
     }
 
@@ -506,7 +581,7 @@ int mera_ob_flush(struct mera_inst *inst)
         memset(rtp, 0, sizeof(*rtp));
         REG_WR(RTE_OUTB_RTP_MISC(i), 0);
     }
-    ob->dg_addr = 0;
+    ob->dg_addr = RTE_OB_DG_BASE;
     return 0;
 }
 
@@ -568,11 +643,26 @@ static int mera_ob_debug_dg_data(struct mera_inst *inst,
                                  uint32_t addr,
                                  uint32_t sec)
 {
-    uint32_t i, n, value, base, cnt;
+    mera_ob_dg_entry_t *dg;
+    uint32_t           i, n, value, base, cnt;
 
-    REG_RD(RTE_OUTB_DG_DATA_SECTION_ADDR(addr), &value);
-    base = RTE_OUTB_DG_DATA_SECTION_ADDR_DG_DATA_SECTION_ADDR_X(value);
-    cnt = ((RTE_OUTB_DG_DATA_SECTION_ADDR_DG_DATA_LEN_X(value) + 3) / 4);
+    if (addr == 0xffffffff) {
+        // Show garbage data at address zero
+        base = 0;
+        cnt = 1;
+    } else {
+        REG_RD(RTE_OUTB_DG_DATA_SECTION_ADDR(addr), &value);
+        base = RTE_OUTB_DG_DATA_SECTION_ADDR_DG_DATA_SECTION_ADDR_X(value);
+        if (base == 0) {
+            // DG is disabled, use configured values
+            dg = &inst->ob.dg_tbl[addr];
+            base = dg->dg_addr;
+            cnt = dg->conf.length;
+        } else {
+            cnt = RTE_OUTB_DG_DATA_SECTION_ADDR_DG_DATA_LEN_X(value);
+        }
+    }
+    cnt = ((cnt + 3) / 4);
     for (i = 0; i < cnt; i++) {
         addr = (base + i);
         if (sec < 3) {
@@ -653,10 +743,10 @@ int mera_ob_debug_print(struct mera_inst *inst,
             dg = &ob->dg_tbl[addr];
             dc = &dg->conf;
             if (addr == rtp->addr) {
-                pr("\n  Addr  DG ID  PDU   DG_Addr  Length  Vld_Chk  Vld_Off  Seq_Chk  Code_Chk  Inv_def\n");
+                pr("\n  Addr  DG ID  Dis  PDU   DG_Addr  Length  Vld_Chk  Vld_Off  Seq_Chk  Code_Chk  Inv_def\n");
             }
-            pr("  %-6u%-7u%-6u%-9u%-8u%-9u%-9u%-9u%-9u%-9u\n",
-               addr, dc->dg_id, dc->pdu_offset, dg->dg_addr, dc->length, dc->valid_chk,
+            pr("  %-6u%-7u%-5u%-6u%-9u%-8u%-9u%-9u%-9u%-9u%-9u\n",
+               addr, dc->dg_id, dg->disabled ? 1 : 0, dc->pdu_offset, dg->dg_addr, dc->length, dc->valid_chk,
                dc->valid_offset, dc->opc_seq_chk, dc->opc_code_chk, dc->invalid_default);
         }
         pr("\n");
@@ -716,11 +806,15 @@ int mera_ob_debug_print(struct mera_inst *inst,
     REG_RD(RTE_OUTB_OPC_DG_MASKS, &value);
     DBG_PR_REG("OPC_DG_MASKS", value);
     DBG_PR_REG_M("STATUS_CODE_MASK", RTE_OUTB_OPC_DG_MASKS_OPC_STATUS_CODE_MASK, value);
-    DBG_PR_REG_M("DATA_SET_FLAGS1_MASK", RTE_OUTB_OPC_DG_MASKS_OPC_DATA_SET_FLAGS1_MASK, value);
-
+    DBG_PR_REG_M("DSF1_MASK", RTE_OUTB_OPC_DG_MASKS_OPC_DATA_SET_FLAGS1_MASK, value);
     DBG_REG(REG_ADDR(RTE_OUTB_STICKY_BITS), "STICKY_BITS");
     DBG_REG(REG_ADDR(RTE_OUTB_BUS_ERROR), "BUS_ERROR");
     pr("\n");
+
+    for (idx = 0; idx < 2; idx++) {
+        pr("Garbage, Section %u:\n", idx);
+        MERA_RC(mera_ob_debug_dg_data(inst, pr, 0xffffffff, idx));
+    }
 
     for (i = 1; i < RTE_OB_RTP_CNT; i++) {
         REG_RD(RTE_OUTB_RTP_MISC(i), &value);
