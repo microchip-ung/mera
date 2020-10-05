@@ -1,0 +1,63 @@
+:sectnumlevels: 5
+:toclevels: 5
+
+= RTE Outbound
+
+== RTE Outbound Overview
+
+The MERA model for controlling RTE-OB is shown below and described in the following
+sections.
+
+* The classified RTP ID of a received frame is used to lookup an RTP entry.
+* Each RTP entry has a list of Data Group (DG) entries with the offset and
+length of the frame data to copy to DG memory.
+* On the output side, each entry in the Write Action List (WAL) table has a configurable
+timer.
+* Write Action (WA) entries added to a WAL specify the destination address of the output
+data.
+
+image::./rte_ob.svg[align=center]
+
+== RTP Table
+Received frames are classified to an RTP ID (`mera_rtp_id_t`) by the Switch Core.
+The RTP table in RTE-OB is setup using `mera_ob_rtp_conf_set()`. Each entry is setup with
+the RTP type (`mera_rtp_type_t`) and the expected PDU length. It is also possible to enable
+a WAL reference, which is triggered when a matching frame is received.
+
+== Data Group List
+Each DG entry in RTE-OB is identified by a DG ID (`mera_ob_dg_id_t`), which must be unique
+for each RTP entry. DG entries are added to an RTP using `mera_ob_dg_add()`. Each entry is
+setup with the PDU offset and length of the data to be copied to the DG memory block 
+allocated for the DG. Depending on the RTP type, it is possible to enable DG checks, which
+must pass before the data is considered valid:
+
+* PN IOPS
+* OPC-UA DataSetFlags
+* OPC-UA MessageSequenceNumber
+* OPC-UA StatusCode/Severity
+
+The status of the DG checks can be retrieved using `mera_ob_dg_status_get()`.
+
+Writing of data to the DG memory can be disabled/enabled using `mera_ob_dg_ctrl_set()`.
+If disabled, data can be manually written into the DG memory with `mera_ob_dg_data_set()`.
+
+== Write Action List Table
+Transfers of data to Output is controlled using a Write Action List table. Each list has a
+timer, which is setup using `mesa_ob_wal_conf_set()`.
+
+If the data is written to SRAM, a 3-buffer system is used. For that purpose, functions are
+available to request/release a read buffer, `mera_ob_wal_req()`/`mera_ob_wal_rel()`.
+
+== Write Action List
+Write Action entries are used to write data to an output address (`mera_ob_wa_add()`). The 
+data may be read from one of two sources:
+
+* Internal transfers are read from an input source, for example SRAM.
+* DG transfers are read from DG memory for a specified RTP ID and DG ID.
+
+== Counters
+Counters for a given RTP ID are available via `mera_ob_rtp_counters_get()`.
+
+== RTE-OB Flush
+The entire RTE-OB configuration can be flushed using `rte_ob_flush()`. This will release
+the allocated DG memory and revert to RTE-OB default configuration.

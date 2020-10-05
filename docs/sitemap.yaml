@@ -14,6 +14,15 @@ pages:
     - name: "Introduction"
       src:  "docs/introduction.adoc"
 
+    - name: "RTE General"
+      src:  "docs/rte_gen.adoc"
+
+    - name: "RTE Outbound"
+      src:  "docs/rte_ob.adoc"
+
+    - name: "RTE Inbound"
+      src:  "docs/rte_ib.adoc"
+
     - name: "MERA API Reference"
       pages:
         - src:  "include/microchip/ethernet/rte/api/main.h"

@@ -1,0 +1,41 @@
+:sectnumlevels: 5
+:toclevels: 5
+
+= MERA General
+
+== Instance Creation
+Initialization starts by creating a MERA instance using `mera_inst_create()`.
+Callback functions to read/write RTE registers must be provided.
+
+== General Configuration
+The RTE must be enabled using `mera_gen_conf_set()`.
+
+== Timers
+Timers are controlled based on a Super Cycle of one second as shown below.
+Each timer (`mera_time_t`) has two fields:
+
+* Offset: Determines the first timeout in a Super Cycle.
+* Interval: Determines the next timeouts in a Super Cycle. 
+
+The offset may be set to `MERA_TIME_OFFSET_NONE` to disable the offset function.
+
+image::./timer.svg[align=center]
+
+== Input/Output Addresses
+The `mera_addr_t` type is used to setup input/output addresses for read/write operations.
+This type includes the interface type (e.g. SRAM) and address value.
+
+== Polling
+Polling of counters should be done every second by calling `mera_poll()`.
+
+== Debug Trace
+The MERA code uses trace macros, which can be used for debug purposes.
+Debug levels can be controlled per group using `mera_trace_conf_set()`.
+The application software must implement functions for printing trace,
+`mera_callout_trace_printf()` and `mera_callout_trace_hex_dump()`.
+
+== Debug Print
+Debugging can also be done using `mera_debug_info_print()`.
+MERA state and RTE registers are printed using the provided print callback function.
+
+
