@@ -24,6 +24,27 @@ static mscc_appl_trace_group_t trace_groups[TRACE_GROUP_CNT] = {
     },
 };
 
+int lock_cnt;
+
+/* MERA callouts */
+void mera_callout_lock(const mera_lock_t *const lock)
+{
+    if (lock_cnt == 0) {
+        lock_cnt = 1;
+    } else {
+        T_E("illegal lock_cnt: %d", lock_cnt);
+    }
+}
+
+void mera_callout_unlock(const mera_lock_t *const lock)
+{
+    if (lock_cnt == 1) {
+        lock_cnt = 0;
+    } else {
+        T_E("illegal lock_cnt: %d", lock_cnt);
+    }
+}
+
 /* ================================================================= *
  *  Option parsing
  * ================================================================= */

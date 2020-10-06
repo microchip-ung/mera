@@ -59,4 +59,20 @@ Counters for a given RTP ID are available via `mera_ib_rtp_counters_get()`.
 The entire RTE-IB configuration can be flushed using `mera_ib_flush()`. This will release
 the allocated frame memory and revert to RTE-IB default configuration.
 
+== API Function List
+`mera_ib_rtp_conf_get()` +
+`mera_ib_rtp_conf_set()` +
+`mera_ib_rtp_data_set()` +
+`mera_ib_ral_conf_get()` +
+`mera_ib_ral_conf_set()` +
+`mera_ib_ral_req()` +
+`mera_ib_ral_rel()` +
+`mera_ib_ra_init()` +
+`mera_ib_ra_add()` +
+`mera_ib_ra_ctrl_set()` +
+`mera_ib_dg_init()` +
+`mera_ib_dg_add()` +
+`mera_ib_flush()` +
+`mera_ib_rtp_counters_get()` +
+`mera_ib_rtp_counters_clr()`
 

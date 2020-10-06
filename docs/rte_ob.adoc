@@ -61,3 +61,21 @@ Counters for a given RTP ID are available via `mera_ob_rtp_counters_get()`.
 == RTE-OB Flush
 The entire RTE-OB configuration can be flushed using `mera_ob_flush()`. This will release
 the allocated DG memory and revert to RTE-OB default configuration.
+
+== API Function List
+`mera_ob_rtp_conf_get()` +
+`mera_ob_rtp_conf_set()` +
+`mera_ob_dg_init()` +
+`mera_ob_dg_add()` +
+`mera_ob_dg_ctrl_set()` +
+`mera_ob_dg_data_set()` +
+`mera_ob_dg_status_get()` +
+`mera_ob_wal_conf_get()` +
+`mera_ob_wal_conf_set()` +
+`mera_ob_wal_req()` +
+`mera_ob_wal_rel()` +
+`mera_ob_wa_init()` +
+`mera_ob_wa_add()` +
+`mera_ob_flush()` +
+`mera_ob_rtp_counters_get()` +
+`mera_ob_rtp_counters_clr()`

@@ -203,6 +203,10 @@ char *mera_addr_txt(char *buf, mera_addr_t *addr);
 int mera_time_get(struct mera_inst *inst, const mera_time_t *time, mera_rte_time_t *rte);
 char *mera_time_txt(char *buf, mera_time_t *time);
 
+// Enter/exit macros for protection
+#define MERA_ENTER(...) { mera_lock_t _lock; _lock.inst = inst; _lock.function = __FUNCTION__; _lock.file = __FILE__; _lock.line = __LINE__; mera_callout_lock(&_lock); }
+#define MERA_EXIT(...) { mera_lock_t _lock; _lock.inst = inst; _lock.function = __FUNCTION__; _lock.file = __FILE__; _lock.line = __LINE__; mera_callout_unlock(&_lock); }
+
 /* ================================================================= *
  *  Register access
  * ================================================================= */

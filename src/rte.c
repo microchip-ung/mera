@@ -233,9 +233,12 @@ char *mera_time_txt(char *buf, mera_time_t *time)
 int mera_poll(struct mera_inst *inst)
 {
     T_I("enter");
+    MERA_ENTER();
     inst = mera_inst_get(inst);
     MERA_RC(mera_ib_poll(inst));
     MERA_RC(mera_ob_poll(inst));
+    MERA_EXIT();
+    T_I("exit");
     return 0;
 }
 
@@ -365,6 +368,7 @@ int mera_debug_info_print(struct mera_inst *inst,
 {
     int all = (info->group == MERA_DEBUG_GROUP_ALL);
 
+    MERA_ENTER();
     inst = mera_inst_get(inst);
     if (all || info->group == MERA_DEBUG_GROUP_GEN) {
         mera_gen_debug_print(inst, pr, info);
@@ -375,5 +379,6 @@ int mera_debug_info_print(struct mera_inst *inst,
     if (all || info->group == MERA_DEBUG_GROUP_OB) {
         mera_ob_debug_print(inst, pr, info);
     }
+    MERA_EXIT();
     return 0;
 }

@@ -47,4 +47,15 @@ The application software must implement functions for printing trace,
 Debugging can also be done using `mera_debug_info_print()`.
 MERA state and RTE registers are printed using the provided print callback function.
 
+== API Function List
+`mera_create()` +
+`mera_destroy()` +
+`mera_gen_conf_get()` +
+`mera_gen_conf_set()` +
+`mera_poll()` +
+`mera_trace_conf_get()` +
+`mera_trace_conf_set()` +
+`mera_debug_info_get()` +
+`mera_debug_info_print()`
+
 
