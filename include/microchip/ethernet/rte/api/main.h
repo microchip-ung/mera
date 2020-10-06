@@ -448,7 +448,7 @@ void mera_callout_trace_printf(const mera_trace_group_t  group,
                                const int                 line,
                                const char                *function,
                                const char                *format,
-                               ...) MERA_ATTR_PRINTF(6, 7);
+                               ...);
 
 // Trace hex-dump callout function
 //
@@ -502,5 +502,21 @@ int mera_debug_info_get(mera_debug_info_t *const info);
 int mera_debug_info_print(struct mera_inst          *inst,
                           const mera_debug_printf_t pr,
                           const mera_debug_info_t   *const info);
+
+// MERA lock structure
+typedef struct {
+    struct mera_inst *inst;     // Instance reference
+    const char       *function; // Function name
+    const char       *file;     // File name
+    int              line;      // Line number
+} mera_lock_t;
+
+// Lock API access
+// lock [IN]  Lock information
+void mera_callout_lock(const mera_lock_t *const lock);
+
+// Unlock API access
+// lock [IN]  Lock information
+void mera_callout_unlock(const mera_lock_t *const lock);
 
 #endif // _MICROCHIP_ETHERNET_RTE_API_MAIN_H_

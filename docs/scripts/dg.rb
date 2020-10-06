@@ -318,7 +318,7 @@ def process_adoc dir, base, ext, content
                 e.replace(snip)
             end
 
-        when /^(mera_\w+)$/, /^(mera_\w+)\([^\)]*\)$/, /^(MERA_\w+)$/,
+        when /^(mera_\w+)$/, /^(mera_\w+)\([^\)]*\)$/, /^(MERA_\w+)$/
             sym = $symbol_index[$1]
             sym_name = $1
 
@@ -331,7 +331,7 @@ def process_adoc dir, base, ext, content
             end
 
         # Members in structures
-        when /^(mera_\w+)::(\w+)$/, /^(mera_\w+)::(\w+)\([^\)]*\)$/,
+        when /^(mera_\w+)::(\w+)$/, /^(mera_\w+)::(\w+)\([^\)]*\)$/
             sym_name = "#{$1}::#{$2}"
             idx = $1.size + 2
             sym_text = e.inner_text[idx..-1]

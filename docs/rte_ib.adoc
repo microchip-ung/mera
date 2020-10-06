@@ -31,7 +31,7 @@ this out with default data. Data can be manually written to the frame using
 
 == Read Action List Table
 Transfers of data from Input is controlled using a Read Action List table. Each list has a
-timer, which is setup using `mesa_ib_ral_conf_set()`.
+timer, which is setup using `mera_ib_ral_conf_set()`.
 
 If the data is read from SRAM, a 3-buffer system is used. For that purpose, functions are
 available to request/release a write buffer, `mera_ib_ral_req()`/`mera_ib_ral_rel()`.
@@ -56,7 +56,7 @@ enable automatic update of frame fields:
 Counters for a given RTP ID are available via `mera_ib_rtp_counters_get()`.
 
 == RTE-IB Flush
-The entire RTE-IB configuration can be flushed using `rte_ib_flush()`. This will release
+The entire RTE-IB configuration can be flushed using `mera_ib_flush()`. This will release
 the allocated frame memory and revert to RTE-IB default configuration.
 
 
