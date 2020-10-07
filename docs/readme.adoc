@@ -1,6 +1,36 @@
+// Copyright (c) 2004-2020 Microchip Technology Inc. and its subsidiaries.
+// SPDX-License-Identifier: MIT
+
 = README
 
 == README
 
-Still nothing here
+MERA (Microchip Ethernet RTE API), is a C library supporting the Real Time Engine
+of the LAN9662 switch.
+
+For an introduction to MERA, read the link:#docs/introduction[Introduction].
+
+=== Audience
+
+This material is targeting engineers integrating the LAN9662 switch and the
+associated SW. The library is written in C and it is expected that the
+audience is fluent in C.
+
+== Readers guide
+
+This is the main MERA documentation. The intention is over time to collect all
+the relevant documentation into the document.
+
+The documentation material is a combination of release-notes, high-level
+introduction documents, detailed technical documents and a C-header file.
+
+The header file should be considered as reference material. This is the real
+header file from the source archives, only processed with color coding, and a
+cross reference DB.
+
+When reading this material, you will find extensive use of cross-references.
+This is to help the reader finding the relevant C-symbols, documents and/or
+examples. Every C symbol is cross-referenced, and it is easy to jump between
+definitions, use of symbol and documents mention a symbol.
+
 

@@ -1,3 +1,6 @@
+// Copyright (c) 2004-2020 Microchip Technology Inc. and its subsidiaries.
+// SPDX-License-Identifier: MIT
+
 :sectnumlevels: 5
 :toclevels: 5
 
@@ -45,7 +48,7 @@ Writing of data to the frame memory can be disabled/enabled using `mera_ib_ra_ct
 == Data Group List
 For each Read Action, a number of DG entries can be added using `mera_ib_dg_add()`. Each
 entry holds the RTP ID and PDU offset used to update the frame memory. It is possible to
-enable automatic update of frame fields:
+enable automatic update of frame fields at specified offsets:
 
 * PN IOPS
 * OPC-UA DataSetFlags1
