@@ -39,6 +39,33 @@ int mera_ib_rtp_conf_get(struct mera_inst    *inst,
     return rc;
 }
 
+static int mera_ib_timer_cmd(struct mera_inst *inst,
+                             uint32_t cmd,
+                             uint32_t type,
+                             uint32_t idx)
+{
+    uint32_t value, i, cnt;
+
+    // Stop and possibly start timer
+    for (i = 0; i < 2; i++) {
+        for (cnt = 0; ; cnt++) {
+            REG_RD(RTE_INB_TIMER_CMD, &value);
+            if (RTE_INB_TIMER_CMD_TIMER_CMD_X(value) == RTE_TIMER_CMD_READY) {
+                break;
+            } else if (cnt == 1000) {
+                T_E("timer not ready");
+                return -1;
+            }
+        }
+        REG_WR(RTE_INB_TIMER_CMD,
+               RTE_INB_TIMER_CMD_TIMER_CMD(i == 0 ? RTE_TIMER_CMD_STOP : cmd) |
+               RTE_INB_TIMER_CMD_TIMER_RSLT(0) |
+               RTE_INB_TIMER_CMD_TIMER_TYPE(type) |
+               RTE_INB_TIMER_CMD_TIMER_IDX(idx));
+    }
+    return 0;
+}
+
 #define IFH_LEN 28
 
 #define RTP_FRAME_LENGTH(len) (len < 60 ? 60 : len)
@@ -54,7 +81,7 @@ static int mera_ib_rtp_conf_set_private(struct mera_inst         *inst,
     uint32_t            ena = (conf->type == MERA_RTP_TYPE_DISABLED ? 0 : 1);
     uint32_t            len = RTP_FRAME_LENGTH(conf->length);
     uint32_t            inj = (conf->mode == MERA_RTP_IB_MODE_INJ ? 1 : 0);
-    uint32_t            i, j, k, m, addr, value, len_old, cnt, chg;
+    uint32_t            i, j, k, m, addr, value, len_old, cnt, chg, cmd;
 
     inst = mera_inst_get(inst);
     ib = &inst->ib;
@@ -93,7 +120,6 @@ static int mera_ib_rtp_conf_set_private(struct mera_inst         *inst,
         addr = RTE_INB_RTP_ADDRS_FRM_DATA_ADDR_X(value);
     }
 
-    rtp->conf = *conf;
     REG_WR(RTE_INB_RTP_FRM_PORT(rtp_id),
            RTE_INB_RTP_FRM_PORT_FRM_LEN(len) |
            RTE_INB_RTP_FRM_PORT_PORT_NUM(conf->port));
@@ -107,11 +133,9 @@ static int mera_ib_rtp_conf_set_private(struct mera_inst         *inst,
     REG_WR(RTE_INB_RTP_FRM_POS(rtp_id), RTE_INB_RTP_FRM_POS_PN_CC_FRM_POS(len - 8));
     REG_WR(RTE_INB_RTP_TIMER_CFG1(rtp_id), RTE_INB_RTP_TIMER_CFG1_FIRST_RUT_CNT(time.first));
     REG_WR(RTE_INB_RTP_TIMER_CFG2(rtp_id), RTE_INB_RTP_TIMER_CFG2_DELTA_RUT_CNT(time.delta));
-    REG_WR(RTE_INB_TIMER_CMD,
-           RTE_INB_TIMER_CMD_TIMER_CMD(ena && inj ? 2 : 1) |
-           RTE_INB_TIMER_CMD_TIMER_RSLT(0) |
-           RTE_INB_TIMER_CMD_TIMER_TYPE(0) |
-           RTE_INB_TIMER_CMD_TIMER_IDX(rtp_id));
+    cmd = (ena && inj ? RTE_TIMER_CMD_START : RTE_TIMER_CMD_STOP);
+    MERA_RC(mera_ib_timer_cmd(inst, cmd, RTE_TIMER_TYPE_RTP, rtp_id));
+    rtp->conf = *conf;
 
     // Frame data
     for (i = 0; i < cnt; i++, addr++) {
@@ -248,12 +272,7 @@ static int mera_ib_ral_conf_set_private(struct mera_inst         *inst,
     inst->ib.ral_tbl[ral_id].conf = *conf;
     REG_WR(RTE_INB_RD_TIMER_CFG1(ral_id), RTE_INB_RD_TIMER_CFG1_FIRST_RUT_CNT(time.first));
     REG_WR(RTE_INB_RD_TIMER_CFG2(ral_id), RTE_INB_RD_TIMER_CFG2_DELTA_RUT_CNT(time.delta));
-    REG_WR(RTE_INB_TIMER_CMD,
-           RTE_INB_TIMER_CMD_TIMER_CMD(2) |
-           RTE_INB_TIMER_CMD_TIMER_RSLT(0) |
-           RTE_INB_TIMER_CMD_TIMER_TYPE(1) |
-           RTE_INB_TIMER_CMD_TIMER_IDX(ral_id));
-    return 0;
+    return mera_ib_timer_cmd(inst, RTE_TIMER_CMD_START, RTE_TIMER_TYPE_RAL, ral_id);
 }
 
 int mera_ib_ral_conf_set(struct mera_inst         *inst,
@@ -600,21 +619,51 @@ int mera_ib_dg_add(struct mera_inst        *inst,
     return rc;
 }
 
-static int mera_ib_flush_private(struct mera_inst *inst)
+static int mera_ib_rtp_counters_update(struct mera_inst       *inst,
+                                       const mera_rtp_id_t    rtp_id,
+                                       mera_ib_rtp_counters_t *const counters,
+                                       int                    clear)
 {
-    mera_ib_t           *ib;
     mera_ib_rtp_entry_t *rtp;
-    uint32_t            i;
+    uint32_t            value;
 
     inst = mera_inst_get(inst);
-    ib = &inst->ib;
-    for (i = 1; i < RTE_OB_RTP_CNT; i++) {
-        rtp = &ib->rtp_tbl[i];
-        REG_WR(RTE_INB_RTP_FRM_PORT(i), 0);
-        REG_WR(RTE_INB_RTP_MISC(i),0);
-        memset(rtp, 0, sizeof(*rtp));
+    MERA_RC(mera_rtp_check(rtp_id));
+    rtp = &inst->ib.rtp_tbl[rtp_id];
+    REG_RD(RTE_INB_RTP_CNT(rtp_id), &value);
+    mera_cnt_16_update(RTE_INB_RTP_CNT_FRM_OTF_CNT_X(value), &rtp->tx_otf, clear);
+    mera_cnt_16_update(RTE_INB_RTP_CNT_FRM_INJ_CNT_X(value), &rtp->tx_inj, clear);
+    if (counters != NULL) {
+        counters->tx_otf = rtp->tx_otf.value;
+        counters->tx_inj = rtp->tx_inj.value;
     }
-    ib->frm_data_addr = 0;
+    return 0;
+}
+
+static int mera_ib_flush_private(struct mera_inst *inst)
+{
+    mera_ib_t *ib;
+    uint32_t  i;
+
+    // Clear lists in hardware
+    inst = mera_inst_get(inst);
+    ib = &inst->ib;
+    for (i = 1; i < RTE_IB_RTP_CNT; i++) {
+        REG_WR(RTE_INB_RTP_FRM_PORT(i), 0);
+        REG_WR(RTE_INB_RTP_MISC(i), 0);
+    }
+    for (i = 0; i < MERA_IB_RAL_CNT; i++) {
+        MERA_RC(mera_ib_timer_cmd(inst, RTE_TIMER_CMD_STOP, RTE_TIMER_TYPE_RAL, i));
+        REG_WR(RTE_INB_RD_ACTION_ADDR(i), RTE_INB_RD_ACTION_ADDR_RD_ACTION_ADDR(0));
+    }
+
+    // Clear state
+    memset(ib, 0, sizeof(*ib));
+
+    // Clear and rebase counters
+    for (i = 1; i < RTE_IB_RTP_CNT; i++) {
+        MERA_RC(mera_ib_rtp_counters_update(inst, i, NULL, 1));
+    }
     return 0;
 }
 
@@ -628,29 +677,6 @@ int mera_ib_flush(struct mera_inst *inst)
     MERA_EXIT();
     T_I("exit");
     return rc;
-}
-
-static int mera_ib_rtp_counters_update(struct mera_inst       *inst,
-                                       const mera_rtp_id_t    rtp_id,
-                                       mera_ib_rtp_counters_t *const counters,
-                                       int                    clear)
-{
-    mera_ib_rtp_entry_t *rtp;
-    uint32_t            value;
-
-    inst = mera_inst_get(inst);
-    MERA_RC(mera_rtp_check(rtp_id));
-    rtp = &inst->ib.rtp_tbl[rtp_id];
-    if (rtp->conf.type != MERA_RTP_TYPE_DISABLED) {
-        REG_RD(RTE_INB_RTP_CNT(rtp_id), &value);
-        mera_cnt_16_update(RTE_INB_RTP_CNT_FRM_OTF_CNT_X(value), &rtp->tx_otf, clear);
-        mera_cnt_16_update(RTE_INB_RTP_CNT_FRM_INJ_CNT_X(value), &rtp->tx_inj, clear);
-    }
-    if (counters != NULL) {
-        counters->tx_otf = rtp->tx_otf.value;
-        counters->tx_inj = rtp->tx_inj.value;
-    }
-    return 0;
 }
 
 int mera_ib_rtp_counters_get(struct mera_inst       *inst,
@@ -691,7 +717,9 @@ int mera_ib_poll(struct mera_inst *inst)
         if (ib->rtp_id >= RTE_IB_RTP_CNT) {
             ib->rtp_id = 1;
         }
-        MERA_RC(mera_ib_rtp_counters_update(inst, ib->rtp_id, NULL, 0));
+        if (ib->rtp_tbl[ib->rtp_id].conf.type != MERA_RTP_TYPE_DISABLED) {
+            MERA_RC(mera_ib_rtp_counters_update(inst, ib->rtp_id, NULL, 0));
+        }
     }
     return 0;
 }
@@ -717,7 +745,7 @@ int mera_ib_debug_print(struct mera_inst *inst,
     addr = ib->frm_data_addr;
     pr("Frame Data Addr: %u (%u bytes used)\n\n", addr, addr * 32);
 
-    for (i = 1; i < RTE_OB_RTP_CNT; i++) {
+    for (i = 1; i < RTE_IB_RTP_CNT; i++) {
         rtp = &ib->rtp_tbl[i];
         rc = &rtp->conf;
         switch (rc->type) {

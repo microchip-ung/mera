@@ -4,18 +4,25 @@
 #define MERA_TRACE_GROUP MERA_TRACE_GROUP_OB
 #include "rte_private.h"
 
-// The first DG word is reserved for garbage
-#define RTE_OB_DG_BASE 1
-
 // Profinet DataStatus value/mask
 #define RTE_OB_PN_DS_MASK 0xb7
 #define RTE_OB_PN_DS_VAL  0x35
 
+static void mera_ob_init_state(mera_ob_t *ob)
+{
+    uint32_t i;
+
+    // The first DG word is reserved for garbage
+    ob->dg_addr = 1;
+
+    // Profinet DataStatus default
+    for (i = 1; i < RTE_OB_RTP_CNT; i++) {
+        ob->rtp_tbl[i].conf.pn_ds = RTE_OB_PN_DS_VAL;
+    }
+}
+
 int mera_ob_init(struct mera_inst *inst)
 {
-    mera_ob_t *ob;
-    uint32_t  i;
-
     T_I("enter");
 
     REG_WR(RTE_OUTB_RTP_STATE, 0xffffffff);
@@ -44,13 +51,7 @@ int mera_ob_init(struct mera_inst *inst)
            RTE_OUTB_OPC_DG_MASKS_OPC_STATUS_CODE_MASK(0xc000) |   // StatusCode bit 14:15 is Severity
            RTE_OUTB_OPC_DG_MASKS_OPC_DATA_SET_FLAGS1_MASK(0x01)); // DataSetFlagss bit 1 is DataValid
 
-    ob = &inst->ob;
-    ob->dg_addr = RTE_OB_DG_BASE;
-
-    // Profinet DataStatus default
-    for (i = 1; i < RTE_OB_RTP_CNT; i++) {
-        ob->rtp_tbl[i].conf.pn_ds = RTE_OB_PN_DS_VAL;
-    }
+    mera_ob_init_state(&inst->ob);
 
     return 0;
 }
@@ -86,6 +87,33 @@ int mera_ob_rtp_conf_get(struct mera_inst    *inst,
     MERA_EXIT();
     T_I("exit");
     return rc;
+}
+
+static int mera_ob_timer_cmd(struct mera_inst *inst,
+                             uint32_t cmd,
+                             uint32_t type,
+                             uint32_t idx)
+{
+    uint32_t value, i, cnt;
+
+    // Stop and possibly start timer
+    for (i = 0; i < 2; i++) {
+        for (cnt = 0; ; cnt++) {
+            REG_RD(RTE_OUTB_TIMER_CMD, &value);
+            if (RTE_OUTB_TIMER_CMD_TIMER_CMD_X(value) == RTE_TIMER_CMD_READY) {
+                break;
+            } else if (cnt == 1000) {
+                T_E("timer not ready");
+                return -1;
+            }
+        }
+        REG_WR(RTE_OUTB_TIMER_CMD,
+               RTE_OUTB_TIMER_CMD_TIMER_CMD(i == 0 ? RTE_TIMER_CMD_STOP : cmd) |
+               RTE_OUTB_TIMER_CMD_TIMER_RSLT(0) |
+               RTE_OUTB_TIMER_CMD_TIMER_TYPE(type) |
+               RTE_OUTB_TIMER_CMD_TIMER_IDX(idx));
+    }
+    return 0;
 }
 
 static int mera_ob_rtp_conf_set_private(struct mera_inst         *inst,
@@ -497,12 +525,7 @@ static int mera_ob_wal_conf_set_private(struct mera_inst         *inst,
     inst->ob.wal_tbl[wal_id].conf = *conf;
     REG_WR(RTE_OUTB_WR_TIMER_CFG1(wal_id), RTE_OUTB_WR_TIMER_CFG1_FIRST_RUT_CNT(time.first));
     REG_WR(RTE_OUTB_WR_TIMER_CFG2(wal_id), RTE_OUTB_WR_TIMER_CFG2_DELTA_RUT_CNT(time.delta));
-    REG_WR(RTE_OUTB_TIMER_CMD,
-           RTE_OUTB_TIMER_CMD_TIMER_CMD(2) |
-           RTE_OUTB_TIMER_CMD_TIMER_RSLT(0) |
-           RTE_OUTB_TIMER_CMD_TIMER_TYPE(1) |
-           RTE_OUTB_TIMER_CMD_TIMER_IDX(wal_id));
-    return 0;
+    return mera_ob_timer_cmd(inst, RTE_TIMER_CMD_START, RTE_TIMER_TYPE_WAL, wal_id);
 }
 
 int mera_ob_wal_conf_set(struct mera_inst         *inst,
@@ -699,20 +722,37 @@ int mera_ob_wal_rel(struct mera_inst       *inst,
     return rc;
 }
 
-static int mera_ob_flush_private(struct mera_inst *inst)
+static int mera_ob_rtp_counters_update(struct mera_inst       *inst,
+                                       const mera_rtp_id_t    rtp_id,
+                                       mera_ob_rtp_counters_t *const counters,
+                                       int                    clear)
 {
-    mera_ob_t           *ob;
-    mera_ob_dg_entry_t  *dg;
     mera_ob_rtp_entry_t *rtp;
-    uint16_t            i, j, addr, prev_addr;
+    uint32_t            value;
 
     inst = mera_inst_get(inst);
-    ob = &inst->ob;
+    MERA_RC(mera_rtp_check(rtp_id));
+    rtp = &inst->ob.rtp_tbl[rtp_id];
+    REG_RD(RTE_OUTB_PDU_RECV_CNT(rtp_id), &value);
+    mera_cnt_16_update(RTE_OUTB_PDU_RECV_CNT_PDU_RECV_CNT0_X(value), &rtp->rx_0, clear);
+    mera_cnt_16_update(RTE_OUTB_PDU_RECV_CNT_PDU_RECV_CNT1_X(value), &rtp->rx_1, clear);
+    if (counters != NULL) {
+        counters->rx_0 = rtp->rx_0.value;
+        counters->rx_1 = rtp->rx_1.value;
+    }
+    return 0;
+}
 
-    // Clear lists in state and hardware
+static int mera_ob_flush_private(struct mera_inst *inst)
+{
+    mera_ob_t *ob;
+    uint16_t  i, j, addr, prev_addr;
+
+    // Clear lists in hardware
+    inst = mera_inst_get(inst);
+    ob = &inst->ob;
     for (i = 1; i < RTE_OB_RTP_CNT; i++) {
-        rtp = &ob->rtp_tbl[i];
-        for (j = 0, addr = rtp->addr, prev_addr = addr; addr != 0; j++) {
+        for (j = 0, addr = ob->rtp_tbl[i].addr, prev_addr = addr; addr != 0; j++) {
             if (j < 3) {
                 REG_WR(RTE_OUTB_DG_ADDR(i, j), RTE_OUTB_DG_ADDR_DG_ADDR(0));
             } else {
@@ -722,15 +762,27 @@ static int mera_ob_flush_private(struct mera_inst *inst)
             REG_WR(RTE_OUTB_DG_DATA_SECTION_ADDR(addr),
                    RTE_OUTB_DG_DATA_SECTION_ADDR_DG_DATA_SECTION_ADDR(0) |
                    RTE_OUTB_DG_DATA_SECTION_ADDR_DG_DATA_LEN(0));
-            dg = &ob->dg_tbl[addr];
-            addr = dg->addr;
-            memset(dg, 0, sizeof(*dg));
-            dg->addr = addr; // Restore address used as prev_addr
+            REG_WR(RTE_OUTB_DG_STICKY_BITS(addr),
+                   RTE_OUTB_DG_STICKY_BITS_PN_IOPS_MISMATCH_STICKY(1) |
+                   RTE_OUTB_DG_STICKY_BITS_OPC_DATA_SET_FLAGS1_MISMATCH_STICKY(1) |
+                   RTE_OUTB_DG_STICKY_BITS_OPC_STATUS_CODE_MISMATCH_STICKY(1));
+            addr = ob->dg_tbl[addr].addr;
         }
-        memset(rtp, 0, sizeof(*rtp));
         REG_WR(RTE_OUTB_RTP_MISC(i), 0);
     }
-    ob->dg_addr = RTE_OB_DG_BASE;
+    for (i = 0; i < MERA_OB_WAL_CNT; i++) {
+        MERA_RC(mera_ob_timer_cmd(inst, RTE_TIMER_CMD_STOP, RTE_TIMER_TYPE_WAL, i));
+        REG_WR(RTE_OUTB_WR_ACTION_ADDR(i), RTE_OUTB_WR_ACTION_ADDR_WR_ACTION_ADDR(0));
+    }
+
+    // Clear state
+    memset(ob, 0, sizeof(*ob));
+    mera_ob_init_state(ob);
+
+    // Clear and rebase counters
+    for (i = 1; i < RTE_OB_RTP_CNT; i++) {
+        MERA_RC(mera_ob_rtp_counters_update(inst, i, NULL, 1));
+    }
     return 0;
 }
 
@@ -744,29 +796,6 @@ int mera_ob_flush(struct mera_inst *inst)
     MERA_EXIT();
     T_I("exit");
     return rc;
-}
-
-static int mera_ob_rtp_counters_update(struct mera_inst       *inst,
-                                       const mera_rtp_id_t    rtp_id,
-                                       mera_ob_rtp_counters_t *const counters,
-                                       int                    clear)
-{
-    mera_ob_rtp_entry_t *rtp;
-    uint32_t            value;
-
-    inst = mera_inst_get(inst);
-    MERA_RC(mera_rtp_check(rtp_id));
-    rtp = &inst->ob.rtp_tbl[rtp_id];
-    if (rtp->conf.type != MERA_RTP_TYPE_DISABLED) {
-        REG_RD(RTE_OUTB_PDU_RECV_CNT(rtp_id), &value);
-        mera_cnt_16_update(RTE_OUTB_PDU_RECV_CNT_PDU_RECV_CNT0_X(value), &rtp->rx_0, clear);
-        mera_cnt_16_update(RTE_OUTB_PDU_RECV_CNT_PDU_RECV_CNT1_X(value), &rtp->rx_1, clear);
-    }
-    if (counters != NULL) {
-        counters->rx_0 = rtp->rx_0.value;
-        counters->rx_1 = rtp->rx_1.value;
-    }
-    return 0;
 }
 
 int mera_ob_rtp_counters_get(struct mera_inst       *inst,
@@ -807,7 +836,9 @@ int mera_ob_poll(struct mera_inst *inst)
         if (ob->rtp_id >= RTE_IB_RTP_CNT) {
             ob->rtp_id = 1;
         }
-        MERA_RC(mera_ob_rtp_counters_update(inst, ob->rtp_id, NULL, 0));
+        if (ob->rtp_tbl[ob->rtp_id].conf.type != MERA_RTP_TYPE_DISABLED) {
+            MERA_RC(mera_ob_rtp_counters_update(inst, ob->rtp_id, NULL, 0));
+        }
     }
     return 0;
 }

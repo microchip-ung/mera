@@ -193,6 +193,17 @@ typedef struct {
     uint32_t delta;
 } mera_rte_time_t;
 
+// RTE timer command
+#define RTE_TIMER_CMD_READY 0
+#define RTE_TIMER_CMD_STOP  1
+#define RTE_TIMER_CMD_START 2
+
+// RTE timer type
+#define RTE_TIMER_TYPE_RTP 0
+#define RTE_TIMER_TYPE_RAL 1
+#define RTE_TIMER_TYPE_WAL 1
+#define RTE_TIMER_TYPE_TSE 2
+
 int mera_ib_init(struct mera_inst *inst);
 int mera_ob_init(struct mera_inst *inst);
 int mera_ib_poll(struct mera_inst *inst);
