@@ -6,25 +6,15 @@
 
 = MERA General
 
-== MERA Lock
-
-The application software must implement callout functions for locking/unlocking
-MERA (`mera_callout_lock()` and `mera_callout_unlock()`):
-
-* If the application is single-threaded, the functions can be empty.
-* If the application is multi-threaded, the functions must take/release a
-semaphore/mutex to protect MERA access. This must initiallly be taken until the
-MERA instance creation and general configuration has been done.
- 
 == Instance Creation
-Initialization starts by creating a MERA instance using `mera_create()`.
-Callback functions to read/write RTE registers must be provided.
+Initialization starts by creating a MERA instance using `mera_create()`:
 
-== General Configuration
-The RTE must be enabled using `mera_gen_conf_set()`.
+* Callback functions to read/write RTE registers must be provided.
+* Callback functions to lock/unlock MERA may be provided for thread protection.
+* Callback functions to trace MERA function calls may be provided.
 
 == Polling
-Polling of counters should be done every second by calling `mera_poll()`.
+Polling of counters should be done at least once per second by calling `mera_poll()`.
 
 == Timers
 Timers are controlled based on a Super Cycle of one second as shown below.
@@ -43,8 +33,6 @@ This type includes the interface type (e.g. SRAM) and address value.
 == Debug Trace
 The MERA code uses trace macros, which can be used for debug purposes.
 Debug levels can be controlled per group using `mera_trace_conf_set()`.
-The application software must implement functions for printing trace,
-`mera_callout_trace_printf()` and `mera_callout_trace_hex_dump()`.
 
 == Debug Print
 Debugging can also be done using `mera_debug_info_print()`.
@@ -53,8 +41,6 @@ MERA state and RTE registers are printed using the provided print callback funct
 == API Function List
 `mera_create()` +
 `mera_destroy()` +
-`mera_gen_conf_get()` +
-`mera_gen_conf_set()` +
 `mera_poll()` +
 `mera_trace_conf_get()` +
 `mera_trace_conf_set()` +

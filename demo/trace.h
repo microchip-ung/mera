@@ -32,6 +32,14 @@ void mscc_appl_trace_register(mscc_appl_trace_module_t *module,
                               mscc_appl_trace_group_t *group,
                               uint32_t count);
 
+void mera_callout_trace_printf(const mera_trace_group_t group,
+                               const mera_trace_level_t level,
+                               const char *file,
+                               const int line,
+                               const char *function,
+                               const char *format,
+                               ...);
+
 void mscc_appl_trace_printf(const char *mname,
                             const char *gname,
                             const mera_trace_level_t level,
@@ -58,6 +66,14 @@ void mscc_appl_trace_hex(const char *mname,
                          const char *function,
                          const unsigned char *byte_p,
                          const int byte_cnt);
+
+void mera_callout_trace_hex_dump(const mera_trace_group_t group,
+                                 const mera_trace_level_t level,
+                                 const char               *file,
+                                 const int                line,
+                                 const char               *function,
+                                 const unsigned char      *byte_p,
+                                 const int                byte_cnt);
 
 // Trace macros
 #define T(_grp, _lvl, _fmt, ...)       { if (trace_groups[_grp].level >= _lvl) mscc_appl_trace_printf(trace_module.name, trace_groups[_grp].name, _lvl, __FILE__, __LINE__, __FUNCTION__, _fmt, ##__VA_ARGS__);}

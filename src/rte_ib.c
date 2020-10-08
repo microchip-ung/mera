@@ -19,8 +19,7 @@ static int mera_ib_rtp_conf_get_private(struct mera_inst    *inst,
                                         const mera_rtp_id_t rtp_id,
                                         mera_ib_rtp_conf_t  *const conf)
 {
-    inst = mera_inst_get(inst);
-    MERA_RC(mera_rtp_check(rtp_id));
+    MERA_RC(mera_rtp_check(inst, rtp_id));
     *conf = inst->ib.rtp_tbl[rtp_id].conf;
     return 0;
 }
@@ -31,11 +30,11 @@ int mera_ib_rtp_conf_get(struct mera_inst    *inst,
 {
     int rc;
 
-    T_I("enter");
     MERA_ENTER();
+    T_I("enter");
     rc = mera_ib_rtp_conf_get_private(inst, rtp_id, conf);
-    MERA_EXIT();
     T_I("exit");
+    MERA_EXIT();
     return rc;
 }
 
@@ -83,9 +82,8 @@ static int mera_ib_rtp_conf_set_private(struct mera_inst         *inst,
     uint32_t            inj = (conf->mode == MERA_RTP_IB_MODE_INJ ? 1 : 0);
     uint32_t            i, j, k, m, addr, value, len_old, cnt, chg, cmd;
 
-    inst = mera_inst_get(inst);
     ib = &inst->ib;
-    MERA_RC(mera_rtp_check(rtp_id));
+    MERA_RC(mera_rtp_check(inst, rtp_id));
     rtp = &ib->rtp_tbl[rtp_id];
     MERA_RC(mera_time_get(inst, &conf->time, &time));
 
@@ -172,11 +170,11 @@ int mera_ib_rtp_conf_set(struct mera_inst         *inst,
 {
     int rc;
 
-    T_I("enter");
     MERA_ENTER();
+    T_I("enter");
     rc = mera_ib_rtp_conf_set_private(inst, rtp_id, conf);
-    MERA_EXIT();
     T_I("exit");
+    MERA_EXIT();
     return rc;
 }
 
@@ -189,9 +187,8 @@ static int mera_ib_rtp_data_set_private(struct mera_inst         *inst,
     uint32_t            addr, value;
     uint16_t            offs, len;
 
-    inst = mera_inst_get(inst);
     ib = &inst->ib;
-    MERA_RC(mera_rtp_check(rtp_id));
+    MERA_RC(mera_rtp_check(inst, rtp_id));
     rtp = &ib->rtp_tbl[rtp_id];
     if (rtp->conf.type == MERA_RTP_TYPE_DISABLED) {
         T_E("rtp_id %u is disabled", rtp_id);
@@ -219,15 +216,15 @@ int mera_ib_rtp_data_set(struct mera_inst         *inst,
 {
     int rc;
 
-    T_I("enter");
     MERA_ENTER();
+    T_I("enter");
     rc = mera_ib_rtp_data_set_private(inst, rtp_id, data);
-    MERA_EXIT();
     T_I("exit");
+    MERA_EXIT();
     return rc;
 }
 
-int mera_ral_check(const mera_ib_ral_id_t ral_id)
+int mera_ral_check(struct mera_inst *inst, const mera_ib_ral_id_t ral_id)
 {
     if (ral_id >= MERA_IB_RAL_CNT) {
         T_E("illegal ral_id: %u", ral_id);
@@ -240,8 +237,7 @@ static int mera_ib_ral_conf_get_private(struct mera_inst       *inst,
                                         const mera_ib_ral_id_t ral_id,
                                         mera_ib_ral_conf_t     *const conf)
 {
-    MERA_RC(mera_ral_check(ral_id));
-    inst = mera_inst_get(inst);
+    MERA_RC(mera_ral_check(inst, ral_id));
     *conf = inst->ib.ral_tbl[ral_id].conf;
     return 0;
 }
@@ -252,11 +248,11 @@ int mera_ib_ral_conf_get(struct mera_inst       *inst,
 {
     int rc;
 
-    T_I("enter");
     MERA_ENTER();
+    T_I("enter");
     rc = mera_ib_ral_conf_get_private(inst, ral_id, conf);
-    MERA_EXIT();
     T_I("exit");
+    MERA_EXIT();
     return rc;
 }
 
@@ -266,8 +262,7 @@ static int mera_ib_ral_conf_set_private(struct mera_inst         *inst,
 {
     mera_rte_time_t time;
 
-    MERA_RC(mera_ral_check(ral_id));
-    inst = mera_inst_get(inst);
+    MERA_RC(mera_ral_check(inst, ral_id));
     MERA_RC(mera_time_get(inst, &conf->time, &time));
     inst->ib.ral_tbl[ral_id].conf = *conf;
     REG_WR(RTE_INB_RD_TIMER_CFG1(ral_id), RTE_INB_RD_TIMER_CFG1_FIRST_RUT_CNT(time.first));
@@ -281,11 +276,11 @@ int mera_ib_ral_conf_set(struct mera_inst         *inst,
 {
     int rc;
 
-    T_I("enter");
     MERA_ENTER();
+    T_I("enter");
     rc = mera_ib_ral_conf_set_private(inst, ral_id, conf);
-    MERA_EXIT();
     T_I("exit");
+    MERA_EXIT();
     return rc;
 }
 
@@ -295,8 +290,7 @@ static int mera_ib_ral_req_private(struct mera_inst       *inst,
 {
     uint32_t value;
 
-    MERA_RC(mera_ral_check(ral_id));
-    inst = mera_inst_get(inst);
+    MERA_RC(mera_ral_check(inst, ral_id));
     REG_RD(RTE_INB_BUF3_WR_REQ(ral_id), &value);
     value = RTE_INB_BUF3_WR_REQ_WR_IDX_X(value);
     if (value > 2) {
@@ -313,11 +307,11 @@ int mera_ib_ral_req(struct mera_inst       *inst,
 {
     int rc;
 
-    T_I("enter");
     MERA_ENTER();
+    T_I("enter");
     rc = mera_ib_ral_req_private(inst, ral_id, buf);
-    MERA_EXIT();
     T_I("exit");
+    MERA_EXIT();
     return rc;
 }
 
@@ -326,8 +320,7 @@ static int mera_ib_ral_rel_private(struct mera_inst       *inst,
 {
     uint32_t value;
 
-    MERA_RC(mera_ral_check(ral_id));
-    inst = mera_inst_get(inst);
+    MERA_RC(mera_ral_check(inst, ral_id));
     REG_RD(RTE_INB_BUF3_WR_REL(ral_id), &value);
     return 0;
 }
@@ -337,11 +330,11 @@ int mera_ib_ral_rel(struct mera_inst       *inst,
 {
     int rc;
 
-    T_I("enter");
     MERA_ENTER();
+    T_I("enter");
     rc = mera_ib_ral_rel_private(inst, ral_id);
-    MERA_EXIT();
     T_I("exit");
+    MERA_EXIT();
     return rc;
 }
 
@@ -361,8 +354,7 @@ static int mera_ib_ra_add_private(struct mera_inst        *inst,
     uint32_t            offset;
     uint16_t            addr, found = 0;
 
-    MERA_RC(mera_ral_check(ral_id));
-    inst = mera_inst_get(inst);
+    MERA_RC(mera_ral_check(inst, ral_id));
     ib = &inst->ib;
     ral = &ib->ral_tbl[ral_id];
 
@@ -394,7 +386,7 @@ static int mera_ib_ra_add_private(struct mera_inst        *inst,
     }
 
     // Update RA entry
-    REG_WR(RTE_INB_BASE_RAI_ADDR(addr), mera_addr_get(&conf->rd_addr));
+    REG_WR(RTE_INB_BASE_RAI_ADDR(addr), mera_addr_get(inst, &conf->rd_addr));
     offset = mera_addr_offset(&conf->rd_addr);
     REG_WR(RTE_INB_OFFSET_RAI_ADDR(addr), offset);
     // Read mode is NONE(0)/REQ_REL(3)/REQ(1)
@@ -434,11 +426,11 @@ int mera_ib_ra_add(struct mera_inst        *inst,
 {
     int rc;
 
-    T_I("enter");
     MERA_ENTER();
+    T_I("enter");
     rc = mera_ib_ra_add_private(inst, ral_id, conf);
-    MERA_EXIT();
     T_I("exit");
+    MERA_EXIT();
     return rc;
 }
 
@@ -451,8 +443,7 @@ static int mera_ib_ra_ctrl_set_private(struct mera_inst        *inst,
     mera_ib_ra_entry_t *ra;
     uint16_t           addr;
 
-    MERA_RC(mera_ral_check(ral_id));
-    inst = mera_inst_get(inst);
+    MERA_RC(mera_ral_check(inst, ral_id));
     ib = &inst->ib;
 
     // Lookup RA
@@ -484,11 +475,11 @@ int mera_ib_ra_ctrl_set(struct mera_inst        *inst,
 {
     int rc;
 
-    T_I("enter");
     MERA_ENTER();
+    T_I("enter");
     rc = mera_ib_ra_ctrl_set_private(inst, ral_id, ra_id, ctrl);
-    MERA_EXIT();
     T_I("exit");
+    MERA_EXIT();
     return rc;
 }
 
@@ -510,10 +501,9 @@ static int mera_ib_dg_add_private(struct mera_inst        *inst,
     uint16_t            addr, ra_addr = 0, found = 0;
     uint32_t            frm_addr, valid_mode, status_mode, opc;
 
-    inst = mera_inst_get(inst);
     ib = &inst->ib;
-    MERA_RC(mera_ral_check(ral_id));
-    MERA_RC(mera_rtp_check(conf->rtp_id));
+    MERA_RC(mera_ral_check(inst, ral_id));
+    MERA_RC(mera_rtp_check(inst, conf->rtp_id));
     rtp = &ib->rtp_tbl[conf->rtp_id];
     if (rtp->conf.type == MERA_RTP_TYPE_DISABLED) {
         T_E("rtp_id %u is disabled", conf->rtp_id);
@@ -611,11 +601,11 @@ int mera_ib_dg_add(struct mera_inst        *inst,
 {
     int rc;
 
-    T_I("enter");
     MERA_ENTER();
+    T_I("enter");
     rc = mera_ib_dg_add_private(inst, ral_id, ra_id, conf);
-    MERA_EXIT();
     T_I("exit");
+    MERA_EXIT();
     return rc;
 }
 
@@ -627,8 +617,7 @@ static int mera_ib_rtp_counters_update(struct mera_inst       *inst,
     mera_ib_rtp_entry_t *rtp;
     uint32_t            value;
 
-    inst = mera_inst_get(inst);
-    MERA_RC(mera_rtp_check(rtp_id));
+    MERA_RC(mera_rtp_check(inst, rtp_id));
     rtp = &inst->ib.rtp_tbl[rtp_id];
     REG_RD(RTE_INB_RTP_CNT(rtp_id), &value);
     mera_cnt_16_update(RTE_INB_RTP_CNT_FRM_OTF_CNT_X(value), &rtp->tx_otf, clear);
@@ -646,7 +635,6 @@ static int mera_ib_flush_private(struct mera_inst *inst)
     uint32_t  i;
 
     // Clear lists in hardware
-    inst = mera_inst_get(inst);
     ib = &inst->ib;
     for (i = 1; i < RTE_IB_RTP_CNT; i++) {
         REG_WR(RTE_INB_RTP_FRM_PORT(i), 0);
@@ -671,11 +659,11 @@ int mera_ib_flush(struct mera_inst *inst)
 {
     int rc;
 
-    T_I("enter");
     MERA_ENTER();
+    T_I("enter");
     rc = mera_ib_flush_private(inst);
-    MERA_EXIT();
     T_I("exit");
+    MERA_EXIT();
     return rc;
 }
 
@@ -685,11 +673,11 @@ int mera_ib_rtp_counters_get(struct mera_inst       *inst,
 {
     int rc;
 
-    T_I("enter");
     MERA_ENTER();
+    T_I("enter");
     rc = mera_ib_rtp_counters_update(inst, rtp_id, counters, 0);
-    MERA_EXIT();
     T_I("exit");
+    MERA_EXIT();
     return rc;
 }
 
@@ -698,11 +686,11 @@ int mera_ib_rtp_counters_clr(struct mera_inst    *inst,
 {
     int rc;
 
-    T_I("enter");
     MERA_ENTER();
+    T_I("enter");
     rc = mera_ib_rtp_counters_update(inst, rtp_id, NULL, 1);
-    MERA_EXIT();
     T_I("exit");
+    MERA_EXIT();
     return rc;
 }
 
@@ -711,7 +699,7 @@ int mera_ib_poll(struct mera_inst *inst)
     mera_ib_t *ib = &inst->ib;
     uint32_t  i;
 
-    T_I("enter");
+    T_N("enter");
     for (i = 0; i < RTE_POLL_CNT; i++) {
         ib->rtp_id++;
         if (ib->rtp_id >= RTE_IB_RTP_CNT) {

@@ -10,12 +10,13 @@
 The MERA model for controlling RTE-IB is shown below and described in the following
 sections.
 
-* The RTP table holds entries describing RTP frames to be transmitted.
-* On the input side, each entry in the Read Action List (RAL) table has a configurable
-timer.
-* Read Action (RA) entries added to a RAL specify the source address and length of the
+* Frame Injection:
+** The RTP table holds entries describing RTP frames to be transmitted.
+* Input Read:
+** Each entry in the Read Action List (RAL) table has a configurable timer.
+** Read Action (RA) entries added to a RAL specify the source address and length of the
 input data.
-* Each RA entry has a list of Data Group (DG) entries with the RTP ID and PDU offset.
+** Each RA entry has a list of Data Group (DG) entries with the RTP ID and PDU offset.
 
 image::./rte_ib.svg[align=center]
 

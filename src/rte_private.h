@@ -37,7 +37,7 @@
 
 // RTE general state
 typedef struct {
-    mera_gen_conf_t conf;
+    int dummy;
 } mera_gen_t;
 
 // One more entry for direct 1-based indexing
@@ -185,7 +185,7 @@ typedef struct mera_inst {
 
 struct mera_inst *mera_inst_get(struct mera_inst *inst);
 
-int mera_rtp_check(const mera_rtp_id_t rtp_id);
+int mera_rtp_check(struct mera_inst *inst, const mera_rtp_id_t rtp_id);
 void mera_cnt_16_update(uint16_t value, mera_counter_t *counter, int clear);
 
 typedef struct {
@@ -208,15 +208,15 @@ int mera_ib_init(struct mera_inst *inst);
 int mera_ob_init(struct mera_inst *inst);
 int mera_ib_poll(struct mera_inst *inst);
 int mera_ob_poll(struct mera_inst *inst);
-uint32_t mera_addr_get(const mera_addr_t *addr);
+uint32_t mera_addr_get(struct mera_inst *inst, const mera_addr_t *addr);
 uint32_t mera_addr_offset(const mera_addr_t *addr);
 char *mera_addr_txt(char *buf, mera_addr_t *addr);
 int mera_time_get(struct mera_inst *inst, const mera_time_t *time, mera_rte_time_t *rte);
 char *mera_time_txt(char *buf, mera_time_t *time);
 
 // Enter/exit macros for protection
-#define MERA_ENTER(...) { mera_lock_t _lock; _lock.inst = inst; _lock.function = __FUNCTION__; _lock.file = __FILE__; _lock.line = __LINE__; mera_callout_lock(&_lock); }
-#define MERA_EXIT(...) { mera_lock_t _lock; _lock.inst = inst; _lock.function = __FUNCTION__; _lock.file = __FILE__; _lock.line = __LINE__; mera_callout_unlock(&_lock); }
+#define MERA_ENTER(...) { mera_lock_t _lock; _lock.function = __FUNCTION__; _lock.file = __FILE__; _lock.line = __LINE__; inst = mera_inst_get(inst); if (inst->cb.lock) inst->cb.lock(&_lock); }
+#define MERA_EXIT(...) { mera_lock_t _lock; _lock.function = __FUNCTION__; _lock.file = __FILE__; _lock.line = __LINE__; inst = mera_inst_get(inst); if (inst->cb.unlock) inst->cb.unlock(&_lock); }
 
 /* ================================================================= *
  *  Register access
@@ -224,7 +224,7 @@ char *mera_time_txt(char *buf, mera_time_t *time);
 int mera_wr(struct mera_inst *inst, uint32_t addr, uint32_t val);
 int mera_rd(struct mera_inst *inst, uint32_t addr, uint32_t *val);
 int mera_wrm(struct mera_inst *inst, uint32_t reg, uint32_t val, uint32_t mask);
-void mera_reg_error(const char *file, int line);
+void mera_reg_error(struct mera_inst *inst, const char *file, int line);
 
 static inline uint32_t mera_target_id_to_addr(int target_id)
 {
@@ -232,7 +232,7 @@ static inline uint32_t mera_target_id_to_addr(int target_id)
             target_id == TARGET_RTE ? LAN966X_TARGET_RTE_OFFSET : 0xffffffff);
 }
 
-static inline uint32_t __ioreg(const char *file, int line,
+static inline uint32_t __ioreg(struct mera_inst *inst, const char *file, int line,
                                int tbaseid, int tinst, int tcnt,
                                int gbase, int ginst, int gcnt, int gwidth,
                                int raddr, int rinst, int rcnt, int rwidth)
@@ -241,7 +241,7 @@ static inline uint32_t __ioreg(const char *file, int line,
 
     if (addr == 0xffffffff || tinst >= tcnt ||
         ginst >= gcnt || rinst >= rcnt) {
-        mera_reg_error(file, line);
+        mera_reg_error(inst, file, line);
         return 0xffffffff;
     }
 
@@ -252,8 +252,8 @@ static inline uint32_t __ioreg(const char *file, int line,
 
 #define IOREG(tbaseid, tinst, tcnt, gbase, ginst, gcnt, gwidth,                \
               raddr, rinst, rcnt, rwidth)                                      \
-        __ioreg(__FILE__, __LINE__, tbaseid, tinst, tcnt, gbase, ginst, gcnt,  \
-                gwidth, raddr, rinst, rcnt, rwidth)
+    __ioreg(inst,__FILE__, __LINE__, tbaseid, tinst, tcnt, gbase, ginst, gcnt, \
+            gwidth, raddr, rinst, rcnt, rwidth)
 
 #define REG_ADDR(p) IOREG(p)
 
@@ -344,13 +344,13 @@ extern mera_trace_conf_t mera_trace_conf[];
 #define T_D_HEX(_byte_p, _byte_cnt) T_DG_HEX(MERA_TRACE_GROUP, _byte_p, _byte_cnt)
 #define T_N_HEX(_byte_p, _byte_cnt) T_NG_HEX(MERA_TRACE_GROUP, _byte_p, _byte_cnt)
 
-#define MERA_T(_grp, _lvl, ...) { if (mera_trace_conf[_grp].level >= _lvl) mera_callout_trace_printf(_grp, _lvl, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__); }
+#define MERA_T(_grp, _lvl, ...) { if (mera_trace_conf[_grp].level >= _lvl && inst->cb.trace_printf) inst->cb.trace_printf(_grp, _lvl, __FILE__, __LINE__, __FUNCTION__, __VA_ARGS__); }
 #define T_EG(_grp, ...) MERA_T(_grp, MERA_TRACE_LEVEL_ERROR, __VA_ARGS__)
 #define T_IG(_grp, ...) MERA_T(_grp, MERA_TRACE_LEVEL_INFO,  __VA_ARGS__)
 #define T_DG(_grp, ...) MERA_T(_grp, MERA_TRACE_LEVEL_DEBUG, __VA_ARGS__)
 #define T_NG(_grp, ...) MERA_T(_grp, MERA_TRACE_LEVEL_NOISE, __VA_ARGS__)
 
-#define MERA_HEX(_grp, _lvl, _byte_p, _byte_cnt) { if (mera_trace_conf[_grp].level >= _lvl) mera_callout_trace_hex_dump(_grp, _lvl, __FILE__, __LINE__, __FUNCTION__, _byte_p, _byte_cnt); }
+#define MERA_HEX(_grp, _lvl, _byte_p, _byte_cnt) { if (mera_trace_conf[_grp].level >= _lvl && inst->cb.trace_hex_dump) inst->cb.trace_hex_dump(_grp, _lvl, __FILE__, __LINE__, __FUNCTION__, _byte_p, _byte_cnt); }
 #define T_EG_HEX(_grp, _byte_p, _byte_cnt) MERA_HEX(_grp, MERA_TRACE_LEVEL_ERROR, _byte_p, _byte_cnt)
 #define T_IG_HEX(_grp, _byte_p, _byte_cnt) MERA_HEX(_grp, MERA_TRACE_LEVEL_INFO,  _byte_p, _byte_cnt)
 #define T_DG_HEX(_grp, _byte_p, _byte_cnt) MERA_HEX(_grp, MERA_TRACE_LEVEL_DEBUG, _byte_p, _byte_cnt)

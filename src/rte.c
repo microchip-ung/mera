@@ -32,7 +32,6 @@ int mera_trace_conf_get(const mera_trace_group_t group,
                         mera_trace_conf_t *const conf)
 {
     if (group >= MERA_TRACE_GROUP_CNT) {
-        T_E("illegal group: %d", group);
         return -1;
     }
     *conf = mera_trace_conf[group];
@@ -44,7 +43,6 @@ int mera_trace_conf_set(const mera_trace_group_t group,
                         const mera_trace_conf_t *const conf)
 {
     if (group >= MERA_TRACE_GROUP_CNT) {
-        T_E("illegal group: %d", group);
         return -1;
     }
     mera_trace_conf[group] = *conf;
@@ -54,12 +52,14 @@ int mera_trace_conf_set(const mera_trace_group_t group,
 /* ================================================================= *
  *  Register access
  * ================================================================= */
-void mera_reg_error(const char *file, int line)
+void mera_reg_error(struct mera_inst *inst, const char *file, int line)
 {
     printf("\n\nFATAL ERROR at %s:%d> Index exceeds replication!\n\n", file, line);
-    mera_callout_trace_printf(MERA_TRACE_GROUP_DEFAULT,
+    if (inst->cb.trace_printf) {
+        inst->cb.trace_printf(MERA_TRACE_GROUP_DEFAULT,
                               MERA_TRACE_LEVEL_ERROR, file, line, file,
                               "Index exceeds replication!");
+    }
 }
 
 /* Read target register using current CPU interface */
@@ -107,6 +107,9 @@ static int mera_gen_init(struct mera_inst *inst)
         return -1;
     }
     T_I("build id: 0x%08x", val);
+    REG_WR(RTE_RTE_CFG, RTE_RTE_CFG_RTE_ENA(1));
+    REG_WR(RTE_SC_LEN, RTE_SC_LEN_SC_LEN(20000000)); // 20.000.000 x 50 nsec = 1 sec
+    REG_WR(RTE_SC_RESET, RTE_SC_RESET_SC_RESET_TIME_NS(1));
     return 0;
 }
 
@@ -123,9 +126,9 @@ struct mera_inst *mera_create(const mera_cb_t *cb)
 {
     struct mera_inst *inst = calloc(1, sizeof(struct mera_inst));
 
-    T_I("enter");
     if (inst) {
         inst->cb = *cb;
+        T_I("enter");
         if (mera_init(inst)) {
             free(inst);
             inst = NULL;
@@ -138,33 +141,12 @@ struct mera_inst *mera_create(const mera_cb_t *cb)
 
 void mera_destroy(struct mera_inst *inst)
 {
-    T_I("enter");
     inst = mera_inst_get(inst);
+    T_I("enter");
     free(inst);
 }
 
-int mera_gen_conf_get(struct mera_inst *inst,
-                      mera_gen_conf_t  *const conf)
-{
-    T_I("enter");
-    inst = mera_inst_get(inst);
-    *conf = inst->gen.conf;
-    return 0;
-}
-
-int mera_gen_conf_set(struct mera_inst      *inst,
-                      const mera_gen_conf_t *const conf)
-{
-    T_I("enter");
-    inst = mera_inst_get(inst);
-    inst->gen.conf = *conf;
-    REG_WR(RTE_RTE_CFG, RTE_RTE_CFG_RTE_ENA(conf->enable ? 1 : 0));
-    REG_WR(RTE_SC_LEN, RTE_SC_LEN_SC_LEN(20000000)); // 20.000.000 x 50 nsec = 1 sec
-    REG_WR(RTE_SC_RESET, RTE_SC_RESET_SC_RESET_TIME_NS(1));
-    return 0;
-}
-
-uint32_t mera_addr_get(const mera_addr_t *addr)
+uint32_t mera_addr_get(struct mera_inst *inst, const mera_addr_t *addr)
 {
     uint32_t base = 0;
 
@@ -232,13 +214,12 @@ char *mera_time_txt(char *buf, mera_time_t *time)
 
 int mera_poll(struct mera_inst *inst)
 {
-    T_I("enter");
     MERA_ENTER();
-    inst = mera_inst_get(inst);
+    T_N("enter");
     MERA_RC(mera_ib_poll(inst));
     MERA_RC(mera_ob_poll(inst));
+    T_N("exit");
     MERA_EXIT();
-    T_I("exit");
     return 0;
 }
 
@@ -326,13 +307,7 @@ static int mera_gen_debug_print(struct mera_inst *inst,
                                 const mera_debug_printf_t pr,
                                 const mera_debug_info_t   *const info)
 {
-    mera_gen_t      *gen = &inst->gen;
-    mera_gen_conf_t *conf = &gen->conf;
-    uint32_t        value;
-
-    mera_debug_print_header(pr, "RTE General State");
-    pr("RTE State : %s\n", conf->enable ? "Enabled" : "Disabled");
-    pr("\n");
+    uint32_t value;
 
     mera_debug_print_header(pr, "RTE General Registers");
     mera_debug_print_reg_header(pr, "RTE General");
@@ -369,7 +344,6 @@ int mera_debug_info_print(struct mera_inst *inst,
     int all = (info->group == MERA_DEBUG_GROUP_ALL);
 
     MERA_ENTER();
-    inst = mera_inst_get(inst);
     if (all || info->group == MERA_DEBUG_GROUP_GEN) {
         mera_gen_debug_print(inst, pr, info);
     }

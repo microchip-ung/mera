@@ -26,8 +26,8 @@ static mscc_appl_trace_group_t trace_groups[TRACE_GROUP_CNT] = {
 
 int lock_cnt;
 
-/* MERA callouts */
-void mera_callout_lock(const mera_lock_t *const lock)
+/* MERA callbacks */
+static void mera_lock(const mera_lock_t *const lock)
 {
     if (lock_cnt == 0) {
         lock_cnt = 1;
@@ -36,7 +36,7 @@ void mera_callout_lock(const mera_lock_t *const lock)
     }
 }
 
-void mera_callout_unlock(const mera_lock_t *const lock)
+static void mera_unlock(const mera_lock_t *const lock)
 {
     if (lock_cnt == 1) {
         lock_cnt = 0;
@@ -241,7 +241,10 @@ int main(int argc, char **argv)
     }
     cb.reg_rd = uio_reg_read;
     cb.reg_wr = uio_reg_write;
-
+    cb.lock = mera_lock;
+    cb.unlock = mera_unlock;
+    cb.trace_printf = mera_callout_trace_printf;
+    cb.trace_hex_dump = mera_callout_trace_hex_dump;
     if ((inst = mera_create(&cb)) == NULL) {
         T_E("rte_create() failed");
         return 1;

@@ -1,0 +1,29 @@
+// Copyright (c) 2004-2020 Microchip Technology Inc. and its subsidiaries.
+// SPDX-License-Identifier: MIT
+
+:sectnumlevels: 5
+:toclevels: 5
+
+= Switch Core
+
+== MESA
+If MESA is used to control the Switch Core, the RTE port and Real Time Classification
+must be done as described in the following sections.
+
+=== RTE Port
+The RTE is associated with port 4 of the switch. It is recommended that this 
+port is placed as the last port in the port map and setup with interface type
+MESA_PORT_INTERFACE_NO_CONNECTION. This is done to ensure that frames classified
+as RTP frames can be forwarded to the RTE.
+
+=== Real Time Classification
+Classification to an RTP ID requires the following:
+
+* The (VID, PCP) is enabled for Real Time classification (VID zero means untagged frames).
+* The frame is matched by an RCL rule mapping to an RTP ID and forwarding to the RTE port.
+
+See the MESA documentation for more details on RCL classification.
+
+== SwitchDev
+
+

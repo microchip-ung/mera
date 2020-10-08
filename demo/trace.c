@@ -167,12 +167,12 @@ void mscc_appl_trace_hex(const char *mname,
 }
 
 void mera_callout_trace_hex_dump(const mera_trace_group_t group,
-                                    const mera_trace_level_t level,
-                                    const char               *file,
-                                    const int                line,
-                                    const char               *function,
-                                    const unsigned char      *byte_p,
-                                    const int                byte_cnt)
+                                 const mera_trace_level_t level,
+                                 const char               *file,
+                                 const int                line,
+                                 const char               *function,
+                                 const unsigned char      *byte_p,
+                                 const int                byte_cnt)
 {
     mera_printf_trace_head(group, level, file, line, function, "\n");
     trace_hex(byte_p, byte_cnt);
