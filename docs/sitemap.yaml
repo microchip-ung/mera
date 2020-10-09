@@ -12,7 +12,7 @@ pages:
           src:  "docs/release-notes/mera-2021.09.adoc"
 
     - name: "Introduction"
-      src:  "docs/introduction.adoc"
+      src:  "docs/intro.adoc"
 
     - name: "Switch Core"
       src:  "docs/switch_core.adoc"
