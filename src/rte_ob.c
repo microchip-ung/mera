@@ -119,10 +119,13 @@ static int mera_ob_rtp_conf_set_private(struct mera_inst         *inst,
                                         const mera_rtp_id_t      rtp_id,
                                         const mera_ob_rtp_conf_t *const conf)
 {
-    uint32_t type = (conf->type == MERA_RTP_TYPE_OPC_UA ? 1 : 0);
-    uint32_t ena = (conf->type == MERA_RTP_TYPE_DISABLED ? 0 : 1);
+    uint32_t        type = (conf->type == MERA_RTP_TYPE_OPC_UA ? 1 : 0);
+    uint32_t        ena = (conf->type == MERA_RTP_TYPE_DISABLED ? 0 : 1);
+    uint32_t        cmd;
+    mera_rte_time_t time;
 
     MERA_RC(mera_rtp_check(inst, rtp_id));
+    MERA_RC(mera_time_get(inst, &conf->time, &time));
     inst->ob.rtp_tbl[rtp_id].conf = *conf;
     REG_WR(RTE_OUTB_RTP_MISC(rtp_id),
            RTE_OUTB_RTP_MISC_RTP_GRP_ID(0) |
@@ -146,7 +149,13 @@ static int mera_ob_rtp_conf_set_private(struct mera_inst         *inst,
            RTE_OUTB_RTP_PN_MISC_PN_DATA_STATUS_MISMATCH_DROP_ENA(1));
 
     REG_WR(RTE_OUTB_RTP_OPC_GRP_VER(rtp_id), conf->opc_grp_ver);
-    return 0;
+
+    // Timer
+    REG_WR(RTE_OUTB_RTP_TIMER_CFG1(rtp_id), RTE_OUTB_RTP_TIMER_CFG1_FIRST_RUT_CNT(time.first));
+    REG_WR(RTE_OUTB_RTP_TIMER_CFG2(rtp_id), RTE_OUTB_RTP_TIMER_CFG2_DELTA_RUT_CNT(time.delta));
+    REG_WR(RTE_OUTB_RTP_TIMER_CFG3(rtp_id), RTE_OUTB_RTP_TIMER_CFG3_TIMEOUT_CNT_THRES(1));
+    cmd = (time.delta ? RTE_TIMER_CMD_START : RTE_TIMER_CMD_STOP);
+    return mera_ob_timer_cmd(inst, cmd, RTE_TIMER_TYPE_RTP, rtp_id);
 }
 
 int mera_ob_rtp_conf_set(struct mera_inst         *inst,
@@ -609,7 +618,7 @@ static int mera_ob_wa_add_private(struct mera_inst        *inst,
            RTE_WR_ACTION_MISC_HW_WR_DIS_MODE(0) |
            RTE_WR_ACTION_MISC_INTERN_ENA(dg ? 0 : 1) |
            RTE_WR_ACTION_MISC_TRANSFER_PROTECT_ENA(0) |
-           RTE_WR_ACTION_MISC_RTP_STOPPED_MODE(0));
+           RTE_WR_ACTION_MISC_RTP_STOPPED_MODE(1));
     REG_WR(RTE_WR_RAI_ADDR(addr), mera_addr_get(inst, &conf->wr_addr));
     REG_WR(RTE_WR_ACTION_RTP_GRP(addr),
            RTE_WR_ACTION_RTP_GRP_RTP_GRP_ID(0) |
@@ -928,6 +937,7 @@ int mera_ob_debug_print(struct mera_inst *inst,
             pr("-");
         }
         pr("\n");
+        pr("Time  : %s\n", mera_time_txt(buf, &rc->time));
         if (mera_ob_rtp_counters_update(inst, i, &cnt, 0) == 0) {
             pr("Rx 0  : %" PRIu64 "\n", cnt.rx_0);
             pr("Rx 1  : %" PRIu64 "\n", cnt.rx_1);
@@ -938,7 +948,7 @@ int mera_ob_debug_print(struct mera_inst *inst,
             if (addr == rtp->addr) {
                 pr("\n  Addr  DG ID  Dis  PDU   DG_Addr  Length  Vld_Chk  Vld_Off  Seq_Chk  Code_Chk  Inv_def\n");
             }
-            pr("  %-6u%-7u%-5u%-6u%-9u%-8u%-9u%-9u%-9u%-9u%-9u\n",
+            pr("  %-6u%-7u%-5u%-6u%-9u%-8u%-9u%-9u%-9u%-10u%-9u\n",
                addr, dc->dg_id, dg->disabled ? 1 : 0, dc->pdu_offset, dg->dg_addr, dc->length, dc->valid_chk,
                dc->valid_offset, dc->opc_seq_chk, dc->opc_code_chk, dc->invalid_default);
         }
@@ -1038,6 +1048,15 @@ int mera_ob_debug_print(struct mera_inst *inst,
         DBG_PR_REG_M("MM_FRM_FWD_ENA", RTE_OUTB_RTP_PN_MISC_PN_CC_MISMATCH_FRM_FWD_ENA, value);
         DBG_PR_REG_M("MM_DROP_ENA", RTE_OUTB_RTP_PN_MISC_PN_DATA_STATUS_MISMATCH_DROP_ENA, value);
         DBG_REG(REG_ADDR(RTE_OUTB_RTP_OPC_GRP_VER(i)), "OPC_GRP_VER");
+        REG_RD(RTE_OUTB_RTP_TIMER_CFG1(i), &value);
+        DBG_PR_REG("TIMER_CFG1", value);
+        DBG_PR_REG_M("FIRST_RUT_CNT", RTE_OUTB_RTP_TIMER_CFG1_FIRST_RUT_CNT, value);
+        DBG_PR_REG_M("TIMER_RUNNING", RTE_OUTB_RTP_TIMER_CFG1_TIMER_RUNNING, value);
+        DBG_REG(REG_ADDR(RTE_OUTB_RTP_TIMER_CFG2(i)), "DELTA_RUT_CNT");
+        REG_RD(RTE_OUTB_RTP_TIMER_CFG3(i), &value);
+        DBG_PR_REG("TIMER_CFG3", value);
+        DBG_PR_REG_M("TIMEOUT_CNT", RTE_OUTB_RTP_TIMER_CFG3_TIMEOUT_CNT, value);
+        DBG_PR_REG_M("TIMEOUT_THR", RTE_OUTB_RTP_TIMER_CFG3_TIMEOUT_CNT_THRES, value);
         REG_RD(RTE_OUTB_PDU_RECV_CNT(i), &value);
         DBG_PR_REG("PDU_RECV_CNT", value);
         DBG_PR_REG_M("CNT0", RTE_OUTB_PDU_RECV_CNT_PDU_RECV_CNT0, value);
@@ -1170,6 +1189,7 @@ int mera_ob_debug_print(struct mera_inst *inst,
             DBG_PR_REG_M("HW_WR_DIS_MODE", RTE_WR_ACTION_MISC_HW_WR_DIS_MODE, value);
             DBG_PR_REG_M("INTERN_ENA", RTE_WR_ACTION_MISC_INTERN_ENA, value);
             DBG_PR_REG_M("TRNSFR_PROTECT_ENA", RTE_WR_ACTION_MISC_TRANSFER_PROTECT_ENA, value);
+            DBG_PR_REG_M("RTP_STOPPED_MODE", RTE_WR_ACTION_MISC_RTP_STOPPED_MODE, value);
             REG_RD(RTE_WR_ACTION_DG_DATA(j), &value);
             DBG_PR_REG("WR_ACTION_DG_DATA", value);
             DBG_PR_REG_M("SECTION_ADDR", RTE_WR_ACTION_DG_DATA_DG_DATA_SECTION_ADDR, value);

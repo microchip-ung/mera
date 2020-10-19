@@ -176,6 +176,7 @@ typedef struct {
     uint32_t         opc_grp_ver; // OPC GroupVersion
     mera_bool_t      wal_enable;  // Trigger Write Action List
     mera_ob_wal_id_t wal_id;      // Write Action List ID
+    mera_time_t      time;        // Timer
 } mera_ob_rtp_conf_t;
 
 // Get RTP Outbound configuration
