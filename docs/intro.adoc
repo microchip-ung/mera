@@ -8,13 +8,13 @@
 
 == Introduction
 
-The Microchip Ethernet RTE API (MERA) can be used to control the Real Time
-Engine (RTE) of the LAN9662 device. The RTE is a HW component closely integrated
-with the TSN switch, it offers HW-offload of Profinet (PN) Real-Time Cycle data
-(RTC) and OPC Unified Unified Architecture, part 14: PubSub (OPC-UA).
+The Microchip Ethernet RTE API (MERA) is used to control the Real Time Engine (RTE)
+of the LAN9662 device. The RTE is a HW component closely integrated with the TSN switch.
+It offers HW-offload of the lower protocol layers of Profinet (PN) Real-Time Cyclic (RTC)
+and OPC Unified Architecture - Publisher/Subscriber (OPC UA PubSub, Part 14).
 
 The Switch Core part of the device must be setup to control switching between Ethernet
-ports as well as classification of frames to Real Time Protocol IDs needed by the RTE.
+ports, and classification of frames to Real Time Protocol Data Unit (RTP) IDs needed by the RTE.
 Two software solutions are available for this purpose:
 
 * SwitchDev driver for Linux (left side of the diagram).
@@ -63,7 +63,7 @@ external CPU is expected to provide the needed peripherals.
 
 The link:#mera/docs/switch_core.adoc[Switch Core] part of the device must be
 setup to control switching between Ethernet ports as well as classification of
-frames to Real Time Protocol IDs needed by the RTE. Two mutually exclusive
+frames to Real Time Protocol Data Unit IDs needed by the RTE. Two mutually exclusive
 software solutions are available for this purpose:
 
 * SwitchDev driver for Linux (left side of the diagram).
@@ -84,7 +84,7 @@ TODO
 == Profinet and RTE
 
 The RTE offers HW facilities to offload the RTC traffic, which is the most
-real-time critical, band-bandwidth and processing demanding part of the Protinet
+real-time critical, band-bandwidth and processing demanding part of the Profinet
 traffic. The RTE HW alone will however not offer a fully complaint Profinet
 stack, to provide this additional SW components are needed.
 
@@ -112,8 +112,12 @@ Profinet system.
 
 | 0x88E3     | MRP                     | Yes/Bridge | This is the Media Redundancy protocol.
 
+| 0xB62C     | OPC UA                  | Yes/RTE    | PublisherId/WriterGroupId (the equivalent of FrameID)
+
 |===
 
+The following description takes its offset in a PROFINET application.
+OPC UA PubSub is supported similarly, but uses different terms.
 The following table provides an overview of the FrameIDs and the sub-protocols
 defined in 0x8892/PROFINET.
 
@@ -148,7 +152,7 @@ by the MERA Library.
 The RTC traffic can be considered as the data-plane of Profinet. Profinet
 defines 2 state-machines: Provider Protocol Machine (PPM) and Consumer
 Protocol Machine (CPM) which operates on the RTC traffic. The PPM and CPM are
-shared functionality in both devices and controllers (PLCs).
+shared functionality in both devices and controllers (PLCs). See IEC 61158-6-10.
 
 This means that the RTE/MERA supports both devices and controllers, in
 additional to that it also supports controllers with local IO (a hybrid of the
@@ -187,9 +191,6 @@ individual modes in more details.
 ==== IOD-RTE-CPU
 
 * This is a PROFINET Device, with the PPM/CPM state-machines offloaded to HW
-** It is similar to the IOD-SW case. But here the network cycle of the RTC
-traffic is offloaded by the RTE. The remaining types of traffic is handled in
-the same way.
 * CPM/PPM in HW, but data goes to CPU
 ** A 3-buffer system is defined to allow race-free exchange of date between HW
 and SW
@@ -213,9 +214,6 @@ image::./iod-rte-cpu.svg[align=center]
 ==== IOC-RTE-CPU
 
 * This is a PROFINET PLC, with the PPM/CPM state-machines offloaded to HW
-** It is similar to the IOC-SW case. But here the network cycle of the RTC
-   traffic is offloaded by the RTE. The remaining types of traffic is handled in
-   the same way.
 * CPM/PPM in HW, but data goes to CPU
 ** A 3-buffer system is defined to allow race-free exchange of date between HW
    and SW
