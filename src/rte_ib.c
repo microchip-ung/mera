@@ -127,7 +127,7 @@ static int mera_ib_rtp_conf_set_private(struct mera_inst         *inst,
            RTE_INB_RTP_MISC_PDU_TYPE(type) |
            RTE_INB_RTP_MISC_LAST_FRM_UPD_CNT(0) |
            RTE_INB_RTP_MISC_OTF_TIMER_RESTART_ENA(0) |
-           RTE_INB_RTP_MISC_RTP_GRP_ID(0));
+           RTE_INB_RTP_MISC_RTP_GRP_ID(conf->grp_id));
     REG_WR(RTE_INB_RTP_FRM_POS(rtp_id), RTE_INB_RTP_FRM_POS_PN_CC_FRM_POS(len - 8));
     REG_WR(RTE_INB_RTP_TIMER_CFG1(rtp_id), RTE_INB_RTP_TIMER_CFG1_FIRST_RUT_CNT(time.first));
     REG_WR(RTE_INB_RTP_TIMER_CFG2(rtp_id), RTE_INB_RTP_TIMER_CFG2_DELTA_RUT_CNT(time.delta));
@@ -752,6 +752,7 @@ int mera_ib_debug_print(struct mera_inst *inst,
         }
         pr("RTP ID: %u\n", i);
         pr("Type  : %s\n", txt);
+        pr("Group : %u\n", rc->grp_id);
         pr("Mode  : %s\n", rc->mode == MERA_RTP_IB_MODE_INJ ? "INJ" : "OTF");
         pr("Time  : %s\n", mera_time_txt(buf, &rc->time));
         len = rc->length;

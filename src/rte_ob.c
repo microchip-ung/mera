@@ -26,6 +26,7 @@ int mera_ob_init(struct mera_inst *inst)
     T_I("enter");
 
     REG_WR(RTE_OUTB_RTP_STATE, 0xffffffff);
+    REG_WR(RTE_RTP_GRP_STATE, 0xffffffff);
     REG_WR(RTE_OUTB_CFG, RTE_OUTB_CFG_OUTB_PORT(4));
 
     // PN PDU/DG checks
@@ -60,6 +61,15 @@ int mera_rtp_check(struct mera_inst *inst, const mera_rtp_id_t rtp_id)
 {
     if (rtp_id == 0 || rtp_id > MERA_RTP_CNT) {
         T_E("illegal rtp_id: %u", rtp_id);
+        return -1;
+    }
+    return 0;
+}
+
+int mera_rtp_grp_check(struct mera_inst *inst, const mera_rtp_grp_id_t grp_id)
+{
+    if (grp_id == 0 || grp_id > MERA_RTP_GRP_CNT) {
+        T_E("illegal grp_id: %u", grp_id);
         return -1;
     }
     return 0;
@@ -128,7 +138,7 @@ static int mera_ob_rtp_conf_set_private(struct mera_inst         *inst,
     MERA_RC(mera_time_get(inst, &conf->time, &time));
     inst->ob.rtp_tbl[rtp_id].conf = *conf;
     REG_WR(RTE_OUTB_RTP_MISC(rtp_id),
-           RTE_OUTB_RTP_MISC_RTP_GRP_ID(0) |
+           RTE_OUTB_RTP_MISC_RTP_GRP_ID(conf->grp_id) |
            RTE_OUTB_RTP_MISC_PDU_TYPE(type) |
            RTE_OUTB_RTP_MISC_RTP_ENA(ena) |
            RTE_OUTB_RTP_MISC_RTP_GRP_STATE_STOPPED_MODE(1) |
@@ -153,7 +163,7 @@ static int mera_ob_rtp_conf_set_private(struct mera_inst         *inst,
     // Timer
     REG_WR(RTE_OUTB_RTP_TIMER_CFG1(rtp_id), RTE_OUTB_RTP_TIMER_CFG1_FIRST_RUT_CNT(time.first));
     REG_WR(RTE_OUTB_RTP_TIMER_CFG2(rtp_id), RTE_OUTB_RTP_TIMER_CFG2_DELTA_RUT_CNT(time.delta));
-    REG_WR(RTE_OUTB_RTP_TIMER_CFG3(rtp_id), RTE_OUTB_RTP_TIMER_CFG3_TIMEOUT_CNT_THRES(1));
+    REG_WR(RTE_OUTB_RTP_TIMER_CFG3(rtp_id), RTE_OUTB_RTP_TIMER_CFG3_TIMEOUT_CNT_THRES(conf->time_cnt));
     cmd = (time.delta ? RTE_TIMER_CMD_START : RTE_TIMER_CMD_STOP);
     return mera_ob_timer_cmd(inst, cmd, RTE_TIMER_TYPE_RTP, rtp_id);
 }
@@ -167,6 +177,110 @@ int mera_ob_rtp_conf_set(struct mera_inst         *inst,
     MERA_ENTER();
     T_I("enter");
     rc = mera_ob_rtp_conf_set_private(inst, rtp_id, conf);
+    T_I("exit");
+    MERA_EXIT();
+    return rc;
+}
+
+int mera_ob_rtp_state_get_private(struct mera_inst    *inst,
+                                  const mera_rtp_id_t rtp_id,
+                                  mera_ob_rtp_state_t *const state)
+{
+    uint32_t value;
+
+    MERA_RC(mera_rtp_check(inst, rtp_id));
+    REG_RD(RTE_OUTB_RTP_STATE, &value);
+    state->active = (value & VTSS_BIT(rtp_id) ? 1 : 0);
+    return 0;
+}
+
+int mera_ob_rtp_state_get(struct mera_inst    *inst,
+                          const mera_rtp_id_t rtp_id,
+                          mera_ob_rtp_state_t *const state)
+{
+    int rc;
+
+    MERA_ENTER();
+    T_I("enter");
+    rc = mera_ob_rtp_state_get_private(inst, rtp_id, state);
+    T_I("exit");
+    MERA_EXIT();
+    return rc;
+}
+
+int mera_ob_rtp_state_set_private(struct mera_inst          *inst,
+                                  const mera_rtp_id_t       rtp_id,
+                                  const mera_ob_rtp_state_t *const state)
+{
+    uint32_t mask;
+
+    MERA_RC(mera_rtp_check(inst, rtp_id));
+    mask = VTSS_BIT(rtp_id);
+    REG_WRM(RTE_OUTB_RTP_STATE, state->active ? mask : 0, mask);
+    return 0;
+}
+
+int mera_ob_rtp_state_set(struct mera_inst          *inst,
+                          const mera_rtp_id_t       rtp_id,
+                          const mera_ob_rtp_state_t *const state)
+{
+    int rc;
+
+    MERA_ENTER();
+    T_I("enter");
+    rc = mera_ob_rtp_state_set_private(inst, rtp_id, state);
+    T_I("exit");
+    MERA_EXIT();
+    return rc;
+}
+
+int mera_ob_rtp_grp_state_get_private(struct mera_inst        *inst,
+                                      const mera_rtp_grp_id_t grp_id,
+                                      mera_ob_rtp_state_t *const state)
+{
+    uint32_t value;
+
+    MERA_RC(mera_rtp_grp_check(inst, grp_id));
+    REG_RD(RTE_RTP_GRP_STATE, &value);
+    state->active = (value & VTSS_BIT(grp_id) ? 1 : 0);
+    return 0;
+}
+
+int mera_ob_rtp_grp_state_get(struct mera_inst        *inst,
+                              const mera_rtp_grp_id_t grp_id,
+                              mera_ob_rtp_state_t *const state)
+{
+    int rc;
+
+    MERA_ENTER();
+    T_I("enter");
+    rc = mera_ob_rtp_grp_state_get_private(inst, grp_id, state);
+    T_I("exit");
+    MERA_EXIT();
+    return rc;
+}
+
+int mera_ob_rtp_grp_state_set_private(struct mera_inst          *inst,
+                                      const mera_rtp_grp_id_t   grp_id,
+                                      const mera_ob_rtp_state_t *const state)
+{
+    uint32_t mask;
+
+    MERA_RC(mera_rtp_grp_check(inst, grp_id));
+    mask = VTSS_BIT(grp_id);
+    REG_WRM(RTE_RTP_GRP_STATE, state->active ? mask : 0, mask);
+    return 0;
+}
+
+int mera_ob_rtp_grp_state_set(struct mera_inst          *inst,
+                              const mera_rtp_grp_id_t   grp_id,
+                              const mera_ob_rtp_state_t *const state)
+{
+    int rc;
+
+    MERA_ENTER();
+    T_I("enter");
+    rc = mera_ob_rtp_grp_state_set_private(inst, grp_id, state);
     T_I("exit");
     MERA_EXIT();
     return rc;
@@ -621,8 +735,8 @@ static int mera_ob_wa_add_private(struct mera_inst        *inst,
            RTE_WR_ACTION_MISC_RTP_STOPPED_MODE(1));
     REG_WR(RTE_WR_RAI_ADDR(addr), mera_addr_get(inst, &conf->wr_addr));
     REG_WR(RTE_WR_ACTION_RTP_GRP(addr),
-           RTE_WR_ACTION_RTP_GRP_RTP_GRP_ID(0) |
-           RTE_WR_ACTION_RTP_GRP_RTP_GRP_STOPPED_MODE(0));
+           RTE_WR_ACTION_RTP_GRP_RTP_GRP_ID(conf->grp_id) |
+           RTE_WR_ACTION_RTP_GRP_RTP_GRP_STOPPED_MODE(1));
     REG_WR(RTE_RD_RAI_ADDR(addr), dg ? 0 : mera_addr_get(inst, &conf->rd_addr));
     REG_WR(RTE_OFFSET_RAI_ADDR(addr), offset);
     REG_WR(RTE_BUF3_ADDR(addr), RTE_BUF3_ADDR_BUF3_ADDR(wal_id));
@@ -884,6 +998,16 @@ static int mera_ob_debug_dg_data(struct mera_inst *inst,
     return 0;
 }
 
+static char *mera_u16_txt(uint16_t val, mera_bool_t enable, char *buf)
+{
+    if (enable) {
+        sprintf(buf, "%u", val);
+    } else {
+        strcpy(buf, "-");
+    }
+    return buf;
+}
+
 int mera_ob_debug_print(struct mera_inst *inst,
                         const mera_debug_printf_t pr,
                         const mera_debug_info_t   *const info)
@@ -930,6 +1054,7 @@ int mera_ob_debug_print(struct mera_inst *inst,
         }
         pr("RTP ID: %u\n", i);
         pr("Type  : %s\n", txt);
+        pr("Group : %u\n", rc->grp_id);
         pr("WAL ID: ");
         if (rc->wal_enable) {
             pr("%u", rc->wal_id);
@@ -938,6 +1063,7 @@ int mera_ob_debug_print(struct mera_inst *inst,
         }
         pr("\n");
         pr("Time  : %s\n", mera_time_txt(buf, &rc->time));
+        pr("Count : %u\n", rc->time_cnt);
         if (mera_ob_rtp_counters_update(inst, i, &cnt, 0) == 0) {
             pr("Rx 0  : %" PRIu64 "\n", cnt.rx_0);
             pr("Rx 1  : %" PRIu64 "\n", cnt.rx_1);
@@ -967,17 +1093,15 @@ int mera_ob_debug_print(struct mera_inst *inst,
             wa = &ob->wa_tbl[addr];
             wc = &wa->conf;
             if (addr == wal->addr) {
-                pr("\n  Addr  RTP  DG   RD Addr            Length  WR Addr\n");
+                pr("\n  Addr  RTP  Group  DG   RD Addr            Length  WR Addr\n");
             }
             pr("  %-6u", addr);
             internal = wc->internal;
-            sprintf(buf, "%u", wc->rtp_id);
-            pr("%-5s", internal ? "-" : buf);
-            sprintf(buf, "%u", wc->dg_id);
-            pr("%-5s", internal ? "-" : buf);
+            pr("%-5s", mera_u16_txt(wc->rtp_id, !internal, buf));
+            pr("%-7s", mera_u16_txt(wc->grp_id, !internal, buf));
+            pr("%-5s", mera_u16_txt(wc->dg_id, !internal, buf));
             pr("%-19s", internal ? mera_addr_txt(buf, &wc->rd_addr) : "-");
-            sprintf(buf, "%u", wc->length);
-            pr("%-8s", internal ? buf : "-");
+            pr("%-8s", mera_u16_txt(wc->length, internal, buf));
             pr("%s\n", mera_addr_txt(buf, &wc->wr_addr));
         }
         pr("\n");
@@ -986,6 +1110,7 @@ int mera_ob_debug_print(struct mera_inst *inst,
     mera_debug_print_header(pr, "RTE Outbound Registers");
     mera_debug_print_reg_header(pr, "RTE Outbound");
     DBG_REG(REG_ADDR(RTE_OUTB_CFG), "OUTB_CFG");
+    DBG_REG(REG_ADDR(RTE_RTP_GRP_STATE), "RTP_GRP_STATE");
     DBG_REG(REG_ADDR(RTE_OUTB_RTP_STATE), "OUTB_RTP_STATE");
     REG_RD(RTE_OUTB_PN_PDU_MISC, &value);
     DBG_PR_REG("PN_PDU_MISC", value);
@@ -1189,7 +1314,11 @@ int mera_ob_debug_print(struct mera_inst *inst,
             DBG_PR_REG_M("HW_WR_DIS_MODE", RTE_WR_ACTION_MISC_HW_WR_DIS_MODE, value);
             DBG_PR_REG_M("INTERN_ENA", RTE_WR_ACTION_MISC_INTERN_ENA, value);
             DBG_PR_REG_M("TRNSFR_PROTECT_ENA", RTE_WR_ACTION_MISC_TRANSFER_PROTECT_ENA, value);
-            DBG_PR_REG_M("RTP_STOPPED_MODE", RTE_WR_ACTION_MISC_RTP_STOPPED_MODE, value);
+            DBG_PR_REG_M("STOPPED_MODE", RTE_WR_ACTION_MISC_RTP_STOPPED_MODE, value);
+            REG_RD(RTE_WR_ACTION_RTP_GRP(j), &value);
+            DBG_PR_REG("WR_ACTION_RTP_GRP", value);
+            DBG_PR_REG_M("GRP_ID", RTE_WR_ACTION_RTP_GRP_RTP_GRP_ID, value);
+            DBG_PR_REG_M("GRP_STOPPED_MODE", RTE_WR_ACTION_RTP_GRP_RTP_GRP_STOPPED_MODE, value);
             REG_RD(RTE_WR_ACTION_DG_DATA(j), &value);
             DBG_PR_REG("WR_ACTION_DG_DATA", value);
             DBG_PR_REG_M("SECTION_ADDR", RTE_WR_ACTION_DG_DATA_DG_DATA_SECTION_ADDR, value);
@@ -1198,8 +1327,6 @@ int mera_ob_debug_print(struct mera_inst *inst,
             DBG_REG(REG_ADDR(RTE_WR_RAI_ADDR(j)), "WR_RAI_ADDR");
             DBG_REG(REG_ADDR(RTE_RD_RAI_ADDR(j)), "RD_RAI_ADDR");
             DBG_REG(REG_ADDR(RTE_OFFSET_RAI_ADDR(j)), "OFFSET_RAI_ADDR");
-            REG_RD(RTE_WR_ACTION_RTP_GRP(j), &value);
-            DBG_PR_REG("RTP_GRP", value);
             DBG_REG(REG_ADDR(RTE_BUF3_ADDR(j)), "BUF3_ADDR");
             pr("\n");
         }

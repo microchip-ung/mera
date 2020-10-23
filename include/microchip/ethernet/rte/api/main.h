@@ -139,6 +139,12 @@ typedef enum {
     MERA_RTP_TYPE_OPC_UA,   // OPC-UA
 } mera_rtp_type_t;
 
+// Number of RTP group IDs
+#define MERA_RTP_GRP_CNT (MERA_RTP_CNT / 2)
+
+// RTP group ID, value zero means no group membership
+typedef uint16_t mera_rtp_grp_id_t;
+
 // RTE I/O interface
 typedef enum {
     MERA_IO_INTF_QSPI,  // QSPI
@@ -162,21 +168,23 @@ typedef struct {
 
 // RTE time
 typedef struct {
-    uint32_t offset;   // Offset from cycle start [nsec]
-    uint32_t interval; // Interval between timeouts [nsec]
+    uint32_t offset;   // Offset from cycle start [nanoseconds]
+    uint32_t interval; // Interval between timeouts [nanoseconds]
 } mera_time_t;
 
 /* - RTE Outbound -------------------------------------------------- */
 
 // RTP Outbound configuration
 typedef struct {
-    mera_rtp_type_t  type;        // RTP entry type
-    uint16_t         length;      // Expected number of bytes after Etype, excluding FCS (zero disables length check)
-    uint8_t          pn_ds;       // Profinet DataStatus, matched using mask 0xb7 (ignore bit 3 and 6)
-    uint32_t         opc_grp_ver; // OPC GroupVersion
-    mera_bool_t      wal_enable;  // Trigger Write Action List
-    mera_ob_wal_id_t wal_id;      // Write Action List ID
-    mera_time_t      time;        // Timer
+    mera_rtp_type_t   type;        // RTP entry type
+    mera_rtp_grp_id_t grp_id;      // RTP group ID
+    uint16_t          length;      // Expected number of bytes after Etype, excluding FCS (zero disables length check)
+    uint8_t           pn_ds;       // Profinet DataStatus, matched using mask 0xb7 (ignore bit 3 and 6)
+    uint32_t          opc_grp_ver; // OPC GroupVersion
+    mera_bool_t       wal_enable;  // Trigger Write Action List
+    mera_ob_wal_id_t  wal_id;      // Write Action List ID
+    mera_time_t       time;        // Timer
+    uint8_t           time_cnt;    // Timeout counter threshold
 } mera_ob_rtp_conf_t;
 
 // Get RTP Outbound configuration
@@ -188,6 +196,31 @@ int mera_ob_rtp_conf_get(struct mera_inst    *inst,
 int mera_ob_rtp_conf_set(struct mera_inst         *inst,
                          const mera_rtp_id_t      rtp_id,
                          const mera_ob_rtp_conf_t *const conf);
+
+// RTP Outbound state
+typedef struct {
+    mera_bool_t active; // Active/stopped
+} mera_ob_rtp_state_t;
+
+// Get RTP Outbound state
+int mera_ob_rtp_state_get(struct mera_inst    *inst,
+                          const mera_rtp_id_t rtp_id,
+                          mera_ob_rtp_state_t *const state);
+
+// Set RTP Outbound state
+int mera_ob_rtp_state_set(struct mera_inst          *inst,
+                          const mera_rtp_id_t       rtp_id,
+                          const mera_ob_rtp_state_t *const state);
+
+// Get RTP Outbound group state
+int mera_ob_rtp_grp_state_get(struct mera_inst        *inst,
+                              const mera_rtp_grp_id_t grp_id,
+                              mera_ob_rtp_state_t *const state);
+
+// Set RTP Outbound group state
+int mera_ob_rtp_grp_state_set(struct mera_inst          *inst,
+                              const mera_rtp_grp_id_t   grp_id,
+                              const mera_ob_rtp_state_t *const state);
 
 // Outbound Data Group ID, must be unique for RTP
 typedef uint16_t mera_ob_dg_id_t;
@@ -279,12 +312,13 @@ int mera_ob_wal_rel(struct mera_inst       *inst,
 
 // Outbound Write Action configuration
 typedef struct {
-    mera_bool_t     internal; // Internal data transfer or data group transfer
-    mera_rtp_id_t   rtp_id;   // RTP ID (non-internal transfer)
-    mera_ob_dg_id_t dg_id;    // Data group ID (non-internal transfer)
-    mera_addr_t     rd_addr;  // Read address (internal transfer)
-    uint16_t        length;   // Data length (internal transfer)
-    mera_addr_t     wr_addr;  // Write address
+    mera_bool_t       internal; // Internal data transfer or data group transfer
+    mera_rtp_id_t     rtp_id;   // RTP ID (non-internal transfer)
+    mera_rtp_grp_id_t grp_id;   // RTP group ID (non-internal transfer)
+    mera_ob_dg_id_t   dg_id;    // Data group ID (non-internal transfer)
+    mera_addr_t       rd_addr;  // Read address (internal transfer)
+    uint16_t          length;   // Data length (internal transfer)
+    mera_addr_t       wr_addr;  // Write address
 } mera_ob_wa_conf_t;
 
 // Initialize Write Action configuration
@@ -325,6 +359,7 @@ typedef enum {
 // RTP Inbound configuration
 typedef struct {
     mera_rtp_type_t    type;   // Type
+    mera_rtp_grp_id_t  grp_id; // RTP group ID
     mera_rtp_ib_mode_t mode;   // Mode
     mera_time_t        time;   // Cycle time (INJ mode)
     uint16_t           port;   // Egress chip port (INJ mode)

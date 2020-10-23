@@ -9,7 +9,7 @@
 == RTE Outbound Overview
 
 The MERA model for controlling RTE-OB is shown below and described in the following
-sections.
+sections. Received frames may contain pieces of data named Data Groups (DGs).
 
 * Data Group Extraction:
 ** The classified RTP ID of a received frame is used to lookup an RTP entry.
@@ -27,6 +27,16 @@ Received frames are classified to an RTP ID (`mera_rtp_id_t`) by the Switch Core
 The RTP table in RTE-OB is setup using `mera_ob_rtp_conf_set()`. Each entry is setup with
 the RTP type (`mera_rtp_type_t`) and the expected PDU length. It is also possible to enable
 a WAL ID, which is triggered when a matching frame is received.
+
+Each RTP entry can be setup with a timer and a counter specifying the number of timeouts
+before the RTP entry is stopped. The entry can be activated again using `mera_ob_rtp_state_set()`.
+
+Each RTP entry can also be mapped to an RTP Group ID (`mera_rtp_grp_id_t`). If the RTP entry
+is stopped, the RTP Group is also stopped until activated using `mera_ob_rtp_grp_state_set()`. 
+When an RTP group is stopped, the following actions are taken:
+
+* Write Actions mapping to the group will write default data to output.
+* Inbound RTP entries mapping to the group are stopped.
 
 == Data Group List
 Each DG entry in RTE-OB is identified by a DG ID (`mera_ob_dg_id_t`), which must be unique

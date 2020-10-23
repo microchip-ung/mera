@@ -24,6 +24,8 @@ Each timer (`mera_time_t`) has two fields:
 `MERA_TIME_OFFSET_NONE` to disable the offset.
 * Interval: Determines the next timeouts in a Super Cycle. 
 
+Both fields are specified in nanoseconds and setup in the RTE with a resolution of 50 ns.
+
 image::./timer.svg[align=center]
 
 == Input/Output Addresses
