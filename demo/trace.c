@@ -185,12 +185,13 @@ void mera_callout_trace_hex_dump(const mera_trace_group_t group,
 #define TRACE_NAME_MAX 64
 
 typedef struct {
-    char                  module_name[TRACE_NAME_MAX];
-    char                  group_name[TRACE_NAME_MAX];
+    char               module_name[TRACE_NAME_MAX];
+    char               group_name[TRACE_NAME_MAX];
     mera_trace_level_t level;
     mera_debug_group_t group;
-    int                   clear;
-    int                   full;
+    mera_rtp_id_t      rtp_id;
+    int                clear;
+    int                full;
 } trace_cli_req_t;
 
 static void trace_control(char *module_name, char *group_name, mera_trace_level_t level, int set)
@@ -267,6 +268,7 @@ static void cli_cmd_debug_api(cli_req_t *req)
         }
     } else if (mera_debug_info_get(&info) == 0) {
         info.group = mreq->group;
+        info.rtp_id = mreq->rtp_id;
         info.full = mreq->full;
         info.clear = mreq->clear;
         mera_debug_info_print(NULL, cli_printf, &info);
@@ -280,7 +282,7 @@ static cli_cmd_t cli_cmd_table[] = {
         cli_cmd_debug_trace
     },
     {
-        "Debug API [<group>] [full] [clear]",
+        "Debug API [<group>] [<rtp_id>] [full] [clear]",
         "Show API debug information",
         cli_cmd_debug_api
     },
@@ -390,6 +392,13 @@ static int cli_parm_api_group(cli_req_t *req)
     return error;
 }
 
+static int cli_parm_api_rtp_id(cli_req_t *req)
+{
+    trace_cli_req_t *mreq = req->module_req;
+
+    return cli_parm_u16(req, &mreq->rtp_id, 1, MERA_RTP_CNT);
+}
+
 static cli_parm_t cli_parm_table[] = {
     {
         "<module>",
@@ -420,6 +429,12 @@ static cli_parm_t cli_parm_table[] = {
         "API Function Group or 'show' to list groups (default: All groups)",
         CLI_PARM_FLAG_NONE,
         cli_parm_api_group
+    },
+    {
+        "<rtp_id>",
+        "RTP ID to show (default: All RTP entries)",
+        CLI_PARM_FLAG_NONE,
+        cli_parm_api_rtp_id
     },
     {
         "clear",

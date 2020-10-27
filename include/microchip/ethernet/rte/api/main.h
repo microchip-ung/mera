@@ -515,9 +515,10 @@ typedef enum
 
 // Debug information structure
 typedef struct {
-    mera_debug_group_t group; // Debug group
-    mera_bool_t        full;  // Full information dump
-    mera_bool_t        clear; // Clear counters
+    mera_debug_group_t group;  // Debug group
+    mera_rtp_id_t      rtp_id; // RTP ID (zero means all)
+    mera_bool_t        full;   // Full information dump
+    mera_bool_t        clear;  // Clear counters
 } mera_debug_info_t;
 
 #if defined(__GNUC__) && (__GNUC__ > 2)

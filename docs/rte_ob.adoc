@@ -30,12 +30,13 @@ a WAL ID, which is triggered when a matching frame is received.
 
 Each RTP entry can be setup with a timer and a counter specifying the number of timeouts
 before the RTP entry is stopped. The entry can be activated again using `mera_ob_rtp_state_set()`.
+When an RTP entry is stopped, Write Actions mapping to the entry will use default data.
 
 Each RTP entry can also be mapped to an RTP Group ID (`mera_rtp_grp_id_t`). If the RTP entry
 is stopped, the RTP Group is also stopped until activated using `mera_ob_rtp_grp_state_set()`. 
-When an RTP group is stopped, the following actions are taken:
+When an RTP group is stopped, the following is done:
 
-* Write Actions mapping to the group will write default data to output.
+* Write Actions mapping to the group will use default data.
 * Inbound RTP entries mapping to the group are stopped.
 
 == Data Group List

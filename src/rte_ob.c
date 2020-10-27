@@ -1008,6 +1008,27 @@ static char *mera_u16_txt(uint16_t val, mera_bool_t enable, char *buf)
     return buf;
 }
 
+static uint32_t mera_ob_wal_rtp_addr(mera_ob_t     *ob,
+                                     uint32_t      wal_addr,
+                                     mera_rtp_id_t rtp_id)
+{
+    uint32_t           addr;
+    mera_ob_wa_entry_t *wa;
+
+    if (rtp_id == 0) {
+        return wal_addr;
+    }
+
+    // Only show WAL if one or more WAs map to the specified RTP ID
+    for (addr = wal_addr; addr != 0; addr = wa->addr) {
+        wa = &ob->wa_tbl[addr];
+        if (wa->conf.rtp_id == rtp_id) {
+            return wal_addr;
+        }
+    }
+    return 0;
+}
+
 int mera_ob_debug_print(struct mera_inst *inst,
                         const mera_debug_printf_t pr,
                         const mera_debug_info_t   *const info)
@@ -1035,6 +1056,10 @@ int mera_ob_debug_print(struct mera_inst *inst,
     pr("DG Addr    : %u (%u bytes used)\n\n", addr, addr * 4);
 
     for (i = 1; i < RTE_OB_RTP_CNT; i++) {
+        if (info->rtp_id != 0 && info->rtp_id != i) {
+            // Only show specified RTP ID
+            continue;
+        }
         rtp = &ob->rtp_tbl[i];
         rc = &rtp->conf;
         addr = rtp->addr;
@@ -1083,7 +1108,7 @@ int mera_ob_debug_print(struct mera_inst *inst,
 
     for (i = 0; i < MERA_OB_WAL_CNT; i++) {
         wal = &ob->wal_tbl[i];
-        addr = wal->addr;
+        addr = mera_ob_wal_rtp_addr(ob, wal->addr, info->rtp_id);
         if (addr == 0 && !info->full) {
             continue;
         }
@@ -1145,6 +1170,10 @@ int mera_ob_debug_print(struct mera_inst *inst,
     }
 
     for (i = 1; i < RTE_OB_RTP_CNT; i++) {
+        if (info->rtp_id != 0 && info->rtp_id != i) {
+            // Only show specified RTP ID
+            continue;
+        }
         REG_RD(RTE_OUTB_RTP_MISC(i), &value);
         if (RTE_OUTB_RTP_MISC_RTP_ENA_X(value) == 0 && !info->full) {
             continue;
@@ -1225,6 +1254,10 @@ int mera_ob_debug_print(struct mera_inst *inst,
         }
 
         j = ob->dg_tbl[i].rtp_id;
+        if (info->rtp_id != 0 && info->rtp_id != j) {
+            // Only show DGs for specified RTP ID
+            continue;
+        }
         sprintf(buf, "OUTB_DG_TBL_%u_%u", i, j);
         mera_debug_print_reg_header(pr, buf);
         REG_RD(RTE_OUTB_DG_MISC(i), &value);
@@ -1283,6 +1316,7 @@ int mera_ob_debug_print(struct mera_inst *inst,
     for (i = 0; i < MERA_OB_WAL_CNT; i++) {
         REG_RD(RTE_OUTB_WR_ACTION_ADDR(i), &value);
         addr = RTE_OUTB_WR_ACTION_ADDR_WR_ACTION_ADDR_X(value);
+        addr = mera_ob_wal_rtp_addr(ob, addr, info->rtp_id);
         if (addr == 0 && !info->full) {
             continue;
         }

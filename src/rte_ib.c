@@ -712,6 +712,32 @@ int mera_ib_poll(struct mera_inst *inst)
     return 0;
 }
 
+static uint32_t mera_ib_ral_rtp_addr(mera_ib_t     *ib,
+                                     uint32_t      ral_addr,
+                                     mera_rtp_id_t rtp_id)
+
+{
+    uint32_t           addr;
+    mera_ib_ra_entry_t *ra;
+    mera_ib_dg_entry_t *dg;
+
+    if (rtp_id == 0) {
+        return ral_addr;
+    }
+
+    // Only show RAL if one or more DGs map to the specified RTP ID
+    for (addr = ral_addr; addr != 0; addr = ra->addr) {
+        ra = &ib->ra_tbl[addr];
+        for (addr = ra->dg_addr; addr != 0; addr = dg->addr) {
+            dg = &ib->dg_tbl[addr];
+            if (dg->conf.rtp_id == rtp_id) {
+                return ral_addr;
+            }
+        }
+    }
+    return 0;
+}
+
 int mera_ib_debug_print(struct mera_inst *inst,
                         const mera_debug_printf_t pr,
                         const mera_debug_info_t   *const info)
@@ -734,6 +760,10 @@ int mera_ib_debug_print(struct mera_inst *inst,
     pr("Frame Data Addr: %u (%u bytes used)\n\n", addr, addr * 32);
 
     for (i = 1; i < RTE_IB_RTP_CNT; i++) {
+        if (info->rtp_id != 0 && info->rtp_id != i) {
+            // Only show specified RTP ID
+            continue;
+        }
         rtp = &ib->rtp_tbl[i];
         rc = &rtp->conf;
         switch (rc->type) {
@@ -778,7 +808,7 @@ int mera_ib_debug_print(struct mera_inst *inst,
 
     for (i = 0; i < MERA_IB_RAL_CNT; i++) {
         ral = &ib->ral_tbl[i];
-        addr = ral->addr;
+        addr = mera_ib_ral_rtp_addr(ib, ral->addr, info->rtp_id);
         if (addr == 0 && !info->full) {
             continue;
         }
@@ -822,6 +852,10 @@ int mera_ib_debug_print(struct mera_inst *inst,
     pr("\n");
 
     for (i = 1; i < RTE_IB_RTP_CNT; i++) {
+        if (info->rtp_id != 0 && info->rtp_id != i) {
+            // Only show specified RTP ID
+            continue;
+        }
         REG_RD(RTE_INB_RTP_MISC(i), &value);
         if (RTE_INB_RTP_MISC_RTP_ENA_X(value) == 0 && !info->full) {
             continue;
@@ -898,6 +932,7 @@ int mera_ib_debug_print(struct mera_inst *inst,
     for (i = 0; i < MERA_IB_RAL_CNT; i++) {
         REG_RD(RTE_INB_RD_ACTION_ADDR(i), &value);
         addr = RTE_INB_RD_ACTION_ADDR_RD_ACTION_ADDR_X(value);
+        addr = mera_ib_ral_rtp_addr(ib, addr, info->rtp_id);
         if (addr == 0 && !info->full) {
             continue;
         }
