@@ -191,6 +191,7 @@ void mera_cnt_16_update(uint16_t value, mera_counter_t *counter, int clear);
 typedef struct {
     uint32_t first;
     uint32_t delta;
+    uint32_t cmd;
 } mera_rte_time_t;
 
 // RTE timer command

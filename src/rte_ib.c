@@ -131,7 +131,7 @@ static int mera_ib_rtp_conf_set_private(struct mera_inst         *inst,
     REG_WR(RTE_INB_RTP_FRM_POS(rtp_id), RTE_INB_RTP_FRM_POS_PN_CC_FRM_POS(len - 8));
     REG_WR(RTE_INB_RTP_TIMER_CFG1(rtp_id), RTE_INB_RTP_TIMER_CFG1_FIRST_RUT_CNT(time.first));
     REG_WR(RTE_INB_RTP_TIMER_CFG2(rtp_id), RTE_INB_RTP_TIMER_CFG2_DELTA_RUT_CNT(time.delta));
-    cmd = (ena && inj ? RTE_TIMER_CMD_START : RTE_TIMER_CMD_STOP);
+    cmd = (ena && inj ? time.cmd : RTE_TIMER_CMD_STOP);
     MERA_RC(mera_ib_timer_cmd(inst, cmd, RTE_TIMER_TYPE_RTP, rtp_id));
     rtp->conf = *conf;
 
@@ -267,7 +267,7 @@ static int mera_ib_ral_conf_set_private(struct mera_inst         *inst,
     inst->ib.ral_tbl[ral_id].conf = *conf;
     REG_WR(RTE_INB_RD_TIMER_CFG1(ral_id), RTE_INB_RD_TIMER_CFG1_FIRST_RUT_CNT(time.first));
     REG_WR(RTE_INB_RD_TIMER_CFG2(ral_id), RTE_INB_RD_TIMER_CFG2_DELTA_RUT_CNT(time.delta));
-    return mera_ib_timer_cmd(inst, RTE_TIMER_CMD_START, RTE_TIMER_TYPE_RAL, ral_id);
+    return mera_ib_timer_cmd(inst, time.cmd, RTE_TIMER_TYPE_RAL, ral_id);
 }
 
 int mera_ib_ral_conf_set(struct mera_inst         *inst,

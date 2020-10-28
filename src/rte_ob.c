@@ -131,7 +131,6 @@ static int mera_ob_rtp_conf_set_private(struct mera_inst         *inst,
 {
     uint32_t        type = (conf->type == MERA_RTP_TYPE_OPC_UA ? 1 : 0);
     uint32_t        ena = (conf->type == MERA_RTP_TYPE_DISABLED ? 0 : 1);
-    uint32_t        cmd;
     mera_rte_time_t time;
 
     MERA_RC(mera_rtp_check(inst, rtp_id));
@@ -164,8 +163,7 @@ static int mera_ob_rtp_conf_set_private(struct mera_inst         *inst,
     REG_WR(RTE_OUTB_RTP_TIMER_CFG1(rtp_id), RTE_OUTB_RTP_TIMER_CFG1_FIRST_RUT_CNT(time.first));
     REG_WR(RTE_OUTB_RTP_TIMER_CFG2(rtp_id), RTE_OUTB_RTP_TIMER_CFG2_DELTA_RUT_CNT(time.delta));
     REG_WR(RTE_OUTB_RTP_TIMER_CFG3(rtp_id), RTE_OUTB_RTP_TIMER_CFG3_TIMEOUT_CNT_THRES(conf->time_cnt));
-    cmd = (time.delta ? RTE_TIMER_CMD_START : RTE_TIMER_CMD_STOP);
-    return mera_ob_timer_cmd(inst, cmd, RTE_TIMER_TYPE_RTP, rtp_id);
+    return mera_ob_timer_cmd(inst, time.cmd, RTE_TIMER_TYPE_RTP, rtp_id);
 }
 
 int mera_ob_rtp_conf_set(struct mera_inst         *inst,
@@ -641,7 +639,7 @@ static int mera_ob_wal_conf_set_private(struct mera_inst         *inst,
     inst->ob.wal_tbl[wal_id].conf = *conf;
     REG_WR(RTE_OUTB_WR_TIMER_CFG1(wal_id), RTE_OUTB_WR_TIMER_CFG1_FIRST_RUT_CNT(time.first));
     REG_WR(RTE_OUTB_WR_TIMER_CFG2(wal_id), RTE_OUTB_WR_TIMER_CFG2_DELTA_RUT_CNT(time.delta));
-    return mera_ob_timer_cmd(inst, RTE_TIMER_CMD_START, RTE_TIMER_TYPE_WAL, wal_id);
+    return mera_ob_timer_cmd(inst, time.cmd, RTE_TIMER_TYPE_WAL, wal_id);
 }
 
 int mera_ob_wal_conf_set(struct mera_inst         *inst,
