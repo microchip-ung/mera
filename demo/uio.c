@@ -14,6 +14,7 @@
 #include <sys/select.h>
 #include <sys/syscall.h>
 #include <sys/un.h>
+#include <endian.h>
 
 #include "main.h"
 #include "trace.h"
@@ -34,7 +35,6 @@ static mscc_appl_trace_group_t trace_groups[TRACE_GROUP_CNT] = {
         .level = MERA_TRACE_LEVEL_ERROR
     },
 };
-
 
 #if (__BYTE_ORDER == __BIG_ENDIAN)
 #define PCIE_HOST_CVT(x) __builtin_bswap32((x))  /* PCIe is LE - we're BE, so swap */
