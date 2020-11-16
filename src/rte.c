@@ -103,7 +103,7 @@ static int mera_gen_init(struct mera_inst *inst)
         diff = (LAN966X_BUILD_ID - val);
     }
     if (diff > 1000) {
-        T_E("unexpected build id. Got: %08x, expected %08x, diff: %u", val, LAN966X_BUILD_ID, diff);
+        T_E("unexpected build id. Got: 0x%08x, expected 0x%08x, diff: %u", val, LAN966X_BUILD_ID, diff);
         return -1;
     }
     T_I("build id: 0x%08x", val);

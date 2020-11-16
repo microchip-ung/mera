@@ -85,6 +85,10 @@ the allocated DG memory and revert to RTE-OB default configuration.
 == API Function List
 `mera_ob_rtp_conf_get()` +
 `mera_ob_rtp_conf_set()` +
+`mera_ob_rtp_state_get()` +
+`mera_ob_rtp_state_set()` +
+`mera_ob_rtp_grp_state_get()` +
+`mera_ob_rtp_grp_state_set()` +
 `mera_ob_dg_init()` +
 `mera_ob_dg_add()` +
 `mera_ob_dg_ctrl_set()` +
