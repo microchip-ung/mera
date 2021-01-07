@@ -172,6 +172,22 @@ typedef struct {
     uint32_t interval; // Interval between timeouts [nanoseconds]
 } mera_time_t;
 
+// RTE events
+typedef enum {
+    MERA_EVENT_RTP_STATE_STOPPED = (1 << 0), // RTP outbound state stopped
+    MERA_EVENT_PN_DS_MISMATCH    = (1 << 1), // RTP outbound Profinet DataStatus mismatch
+    MERA_EVENT_DG_INVALID        = (1 << 2), // RTP outbound DG invalid
+} mera_event_t;
+
+// Enable/disable interrupt generation for one or more events
+int mera_event_enable(struct mera_inst   *inst,
+                      const mera_event_t ev_mask,
+                      const mera_bool_t  enable);
+
+// Poll and clear events
+int mera_event_poll(struct mera_inst *inst,
+                    mera_event_t     *const ev_mask);
+
 /* - RTE Outbound -------------------------------------------------- */
 
 // RTP Outbound configuration
@@ -180,6 +196,7 @@ typedef struct {
     mera_rtp_grp_id_t grp_id;      // RTP group ID
     uint16_t          length;      // Expected number of bytes after Etype, excluding FCS (zero disables length check)
     uint8_t           pn_ds;       // Profinet DataStatus, matched using mask 0xb7 (ignore bit 3 and 6)
+    mera_bool_t       pn_discard;  // Discard if Profinet DataStatus mismatch
     uint32_t          opc_grp_ver; // OPC GroupVersion
     mera_bool_t       wal_enable;  // Trigger Write Action List
     mera_ob_wal_id_t  wal_id;      // Write Action List ID
@@ -196,6 +213,17 @@ int mera_ob_rtp_conf_get(struct mera_inst    *inst,
 int mera_ob_rtp_conf_set(struct mera_inst         *inst,
                          const mera_rtp_id_t      rtp_id,
                          const mera_ob_rtp_conf_t *const conf);
+
+// RTP Outbound status
+typedef struct {
+    mera_bool_t pn_ds_chk; // Profinet DataStatus match check failed
+    uint8_t     pn_ds;     // Profinet DataStatus value
+} mera_ob_rtp_status_t;
+
+// Get RTP Outbound status
+int mera_ob_rtp_status_get(struct mera_inst     *inst,
+                           const mera_rtp_id_t  rtp_id,
+                           mera_ob_rtp_status_t *const status);
 
 // RTP Outbound state
 typedef struct {

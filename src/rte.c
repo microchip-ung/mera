@@ -217,6 +217,73 @@ int mera_poll(struct mera_inst *inst)
     return 0;
 }
 
+int mera_event_enable_private(struct mera_inst   *inst,
+                              const mera_event_t ev_mask,
+                              const mera_bool_t  enable)
+{
+    uint32_t mask = 0;
+
+    if (ev_mask & MERA_EVENT_RTP_STATE_STOPPED) {
+        mask |= RTE_OUTB_STICKY_BITS_RTP_STATE_STOPPED_STICKY_M;
+    }
+    if (ev_mask & MERA_EVENT_PN_DS_MISMATCH) {
+        mask |= RTE_OUTB_STICKY_BITS_PN_DATA_STATUS_MISMATCH_STICKY_M;
+    }
+    if (ev_mask & MERA_EVENT_DG_INVALID) {
+        mask |= RTE_OUTB_STICKY_BITS_DG_NOT_VLD_STICKY_M;
+    }
+    REG_WRM(RTE_OUTB_STICKY_BITS_IRQ_MASK, enable ? mask : 0, mask);
+    return 0;
+}
+
+int mera_event_enable(struct mera_inst   *inst,
+                      const mera_event_t ev_mask,
+                      const mera_bool_t  enable)
+{
+    int rc;
+
+    MERA_ENTER();
+    T_I("enter");
+    rc = mera_event_enable_private(inst, ev_mask, enable);
+    T_I("exit");
+    MERA_EXIT();
+    return rc;
+}
+
+int mera_event_poll_private(struct mera_inst *inst,
+                            mera_event_t     *const ev_mask)
+{
+    uint32_t value, mask = 0;
+
+    // Read and clear sticky bits
+    REG_RD(RTE_OUTB_STICKY_BITS, &value);
+    REG_WR(RTE_OUTB_STICKY_BITS, value);
+    if (RTE_OUTB_STICKY_BITS_RTP_STATE_STOPPED_STICKY_X(value)) {
+        mask |= MERA_EVENT_RTP_STATE_STOPPED;
+    }
+    if (RTE_OUTB_STICKY_BITS_PN_DATA_STATUS_MISMATCH_STICKY_X(value)) {
+        mask |= MERA_EVENT_PN_DS_MISMATCH;
+    }
+    if (RTE_OUTB_STICKY_BITS_DG_NOT_VLD_STICKY_X(value)) {
+        mask |= MERA_EVENT_DG_INVALID;
+    }
+    *ev_mask = mask;
+    return 0;
+}
+
+int mera_event_poll(struct mera_inst *inst,
+                    mera_event_t     *const ev_mask)
+{
+    int rc;
+
+    MERA_ENTER();
+    T_I("enter");
+    rc = mera_event_poll_private(inst, ev_mask);
+    T_I("exit");
+    MERA_EXIT();
+    return rc;
+}
+
 void mera_cnt_16_update(uint16_t value, mera_counter_t *counter, int clear)
 {
     uint64_t add = 0;

@@ -26,7 +26,8 @@ image::./rte_ob.svg[align=center]
 Received frames are classified to an RTP ID (`mera_rtp_id_t`) by the Switch Core.
 The RTP table in RTE-OB is setup using `mera_ob_rtp_conf_set()`. Each entry is setup with
 the RTP type (`mera_rtp_type_t`) and the expected PDU length. It is also possible to enable
-a WAL ID, which is triggered when a matching frame is received.
+a WAL ID, which is triggered when a matching frame is received. The status of the entry 
+can be retrieved using `mera_ob_rtp_status_get()`.
 
 Each RTP entry can be setup with a timer and a counter specifying the number of timeouts
 before the RTP entry is stopped. The entry can be activated again using `mera_ob_rtp_state_set()`.

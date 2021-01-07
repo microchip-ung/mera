@@ -155,7 +155,7 @@ static int mera_ob_rtp_conf_set_private(struct mera_inst         *inst,
            RTE_OUTB_RTP_PN_MISC_PN_DATA_STATUS_MISMATCH_VAL(0) |
            RTE_OUTB_RTP_PN_MISC_PN_CC_CHK_ENA(1) |
            RTE_OUTB_RTP_PN_MISC_PN_CC_MISMATCH_FRM_FWD_ENA(0) |
-           RTE_OUTB_RTP_PN_MISC_PN_DATA_STATUS_MISMATCH_DROP_ENA(1));
+           RTE_OUTB_RTP_PN_MISC_PN_DATA_STATUS_MISMATCH_DROP_ENA(conf->pn_discard));
 
     REG_WR(RTE_OUTB_RTP_OPC_GRP_VER(rtp_id), conf->opc_grp_ver);
 
@@ -180,9 +180,43 @@ int mera_ob_rtp_conf_set(struct mera_inst         *inst,
     return rc;
 }
 
-int mera_ob_rtp_state_get_private(struct mera_inst    *inst,
-                                  const mera_rtp_id_t rtp_id,
-                                  mera_ob_rtp_state_t *const state)
+static int mera_ob_rtp_status_get_private(struct mera_inst     *inst,
+                                          const mera_rtp_id_t  rtp_id,
+                                          mera_ob_rtp_status_t *const status)
+{
+    uint32_t value;
+
+    // Read and clear sticky bits
+    MERA_RC(mera_rtp_check(inst, rtp_id));
+    memset(status, 0, sizeof(*status));
+    REG_RD(RTE_OUTB_RTP_STICKY_BITS(rtp_id), &value);
+    value &= RTE_OUTB_RTP_STICKY_BITS_PN_DATA_STATUS_MISMATCH_STICKY_M;
+    if (value) {
+        REG_WR(RTE_OUTB_RTP_STICKY_BITS(rtp_id), value);
+        REG_RD(RTE_OUTB_RTP_PN_MISC(rtp_id), &value);
+        status->pn_ds_chk = 1;
+        status->pn_ds = RTE_OUTB_RTP_PN_MISC_PN_DATA_STATUS_MISMATCH_VAL_X(value);
+    }
+    return 0;
+}
+
+int mera_ob_rtp_status_get(struct mera_inst     *inst,
+                           const mera_rtp_id_t  rtp_id,
+                           mera_ob_rtp_status_t *const status)
+{
+    int rc;
+
+    MERA_ENTER();
+    T_I("enter");
+    rc = mera_ob_rtp_status_get_private(inst, rtp_id, status);
+    T_I("exit");
+    MERA_EXIT();
+    return rc;
+}
+
+static int mera_ob_rtp_state_get_private(struct mera_inst    *inst,
+                                         const mera_rtp_id_t rtp_id,
+                                         mera_ob_rtp_state_t *const state)
 {
     uint32_t value;
 
@@ -206,9 +240,9 @@ int mera_ob_rtp_state_get(struct mera_inst    *inst,
     return rc;
 }
 
-int mera_ob_rtp_state_set_private(struct mera_inst          *inst,
-                                  const mera_rtp_id_t       rtp_id,
-                                  const mera_ob_rtp_state_t *const state)
+static int mera_ob_rtp_state_set_private(struct mera_inst          *inst,
+                                         const mera_rtp_id_t       rtp_id,
+                                         const mera_ob_rtp_state_t *const state)
 {
     uint32_t mask;
 
@@ -232,9 +266,9 @@ int mera_ob_rtp_state_set(struct mera_inst          *inst,
     return rc;
 }
 
-int mera_ob_rtp_grp_state_get_private(struct mera_inst        *inst,
-                                      const mera_rtp_grp_id_t grp_id,
-                                      mera_ob_rtp_state_t *const state)
+static int mera_ob_rtp_grp_state_get_private(struct mera_inst        *inst,
+                                             const mera_rtp_grp_id_t grp_id,
+                                             mera_ob_rtp_state_t *const state)
 {
     uint32_t value;
 
@@ -258,9 +292,9 @@ int mera_ob_rtp_grp_state_get(struct mera_inst        *inst,
     return rc;
 }
 
-int mera_ob_rtp_grp_state_set_private(struct mera_inst          *inst,
-                                      const mera_rtp_grp_id_t   grp_id,
-                                      const mera_ob_rtp_state_t *const state)
+static int mera_ob_rtp_grp_state_set_private(struct mera_inst          *inst,
+                                             const mera_rtp_grp_id_t   grp_id,
+                                             const mera_ob_rtp_state_t *const state)
 {
     uint32_t mask;
 
@@ -1158,6 +1192,7 @@ int mera_ob_debug_print(struct mera_inst *inst,
     DBG_PR_REG("OPC_DG_MASKS", value);
     DBG_PR_REG_M("STATUS_CODE_MASK", RTE_OUTB_OPC_DG_MASKS_OPC_STATUS_CODE_MASK, value);
     DBG_PR_REG_M("DSF1_MASK", RTE_OUTB_OPC_DG_MASKS_OPC_DATA_SET_FLAGS1_MASK, value);
+    DBG_REG(REG_ADDR(RTE_OUTB_STICKY_BITS_IRQ_MASK), "IRQ_MASK");
     DBG_REG(REG_ADDR(RTE_OUTB_STICKY_BITS), "STICKY_BITS");
     DBG_REG(REG_ADDR(RTE_OUTB_BUS_ERROR), "BUS_ERROR");
     pr("\n");

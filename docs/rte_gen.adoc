@@ -32,6 +32,10 @@ image::./timer.svg[align=center]
 The `mera_addr_t` type is used to setup input/output addresses for read/write operations.
 This type includes the interface type (e.g. SRAM) and address value.
 
+== Events
+The RTE may trigger a number of events (`mera_event_t`). Interrupt generation is controlled
+using `mera_event_enable()`. Polling for events is done using `mera_event_poll()`.
+
 == Debug Trace
 The MERA code uses trace macros, which can be used for debug purposes.
 Debug levels can be controlled per group using `mera_trace_conf_set()`.
