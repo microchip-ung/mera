@@ -174,6 +174,7 @@ typedef struct {
 
 // RTE events
 typedef enum {
+    MERA_EVENT_NONE              = 0,        // No event
     MERA_EVENT_RTP_STATE_STOPPED = (1 << 0), // RTP outbound state stopped
     MERA_EVENT_PN_DS_MISMATCH    = (1 << 1), // RTP outbound Profinet DataStatus mismatch
     MERA_EVENT_DG_INVALID        = (1 << 2), // RTP outbound DG invalid
