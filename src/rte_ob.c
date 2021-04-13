@@ -21,12 +21,30 @@ static void mera_ob_init_state(mera_ob_t *ob)
     }
 }
 
+// Number of RTP and group registers
+#define MERA_RTP_REG_CNT     ((MERA_RTP_CNT + 32) / 32)
+#define MERA_RTP_GRP_REG_CNT ((MERA_RTP_GRP_CNT + 32) / 32)
+
 int mera_ob_init(struct mera_inst *inst)
 {
+    uint32_t i, value = 0xffffffff;
+
     T_I("enter");
 
-    REG_WR(RTE_OUTB_RTP_STATE, 0xffffffff);
-    REG_WR(RTE_RTP_GRP_STATE, 0xffffffff);
+    for (i = 0; i < MERA_RTP_REG_CNT; i++) {
+#if (MERA_RTP_REG_CNT == 1)
+        REG_WR(RTE_OUTB_RTP_STATE, value);
+#else
+        REG_WR(RTE_OUTB_RTP_STATE(i), value);
+#endif
+    }
+    for (i = 0; i < MERA_RTP_GRP_REG_CNT; i++) {
+#if (MERA_RTP_GRP_REG_CNT == 1)
+        REG_WR(RTE_RTP_GRP_STATE, value);
+#else
+        REG_WR(RTE_RTP_GRP_STATE(i), value);
+#endif
+    }
     REG_WR(RTE_OUTB_CFG, RTE_OUTB_CFG_OUTB_PORT(4));
 
     // PN PDU/DG checks
@@ -221,8 +239,12 @@ static int mera_ob_rtp_state_get_private(struct mera_inst    *inst,
     uint32_t value;
 
     MERA_RC(mera_rtp_check(inst, rtp_id));
+#if (MERA_RTP_REG_CNT == 1)
     REG_RD(RTE_OUTB_RTP_STATE, &value);
-    state->active = (value & VTSS_BIT(rtp_id) ? 1 : 0);
+#else
+    REG_RD(RTE_OUTB_RTP_STATE(rtp_id / 32), &value);
+#endif
+    state->active = (value & VTSS_BIT(rtp_id % 32) ? 1 : 0);
     return 0;
 }
 
@@ -244,11 +266,16 @@ static int mera_ob_rtp_state_set_private(struct mera_inst          *inst,
                                          const mera_rtp_id_t       rtp_id,
                                          const mera_ob_rtp_state_t *const state)
 {
-    uint32_t mask;
+    uint32_t mask, value;
 
     MERA_RC(mera_rtp_check(inst, rtp_id));
-    mask = VTSS_BIT(rtp_id);
-    REG_WRM(RTE_OUTB_RTP_STATE, state->active ? mask : 0, mask);
+    mask = VTSS_BIT(rtp_id % 32);
+    value = (state->active ? mask : 0);
+#if (MERA_RTP_REG_CNT == 1)
+    REG_WRM(RTE_OUTB_RTP_STATE, value, mask);
+#else
+    REG_WRM(RTE_OUTB_RTP_STATE(rtp_id / 32), value, mask);
+#endif
     return 0;
 }
 
@@ -273,8 +300,12 @@ static int mera_ob_rtp_grp_state_get_private(struct mera_inst        *inst,
     uint32_t value;
 
     MERA_RC(mera_rtp_grp_check(inst, grp_id));
+#if (MERA_RTP_GRP_REG_CNT == 1)
     REG_RD(RTE_RTP_GRP_STATE, &value);
-    state->active = (value & VTSS_BIT(grp_id) ? 1 : 0);
+#else
+    REG_RD(RTE_RTP_GRP_STATE(grp_id / 32), &value);
+#endif
+    state->active = (value & VTSS_BIT(grp_id % 32) ? 1 : 0);
     return 0;
 }
 
@@ -296,11 +327,16 @@ static int mera_ob_rtp_grp_state_set_private(struct mera_inst          *inst,
                                              const mera_rtp_grp_id_t   grp_id,
                                              const mera_ob_rtp_state_t *const state)
 {
-    uint32_t mask;
+    uint32_t mask, value;
 
     MERA_RC(mera_rtp_grp_check(inst, grp_id));
-    mask = VTSS_BIT(grp_id);
-    REG_WRM(RTE_RTP_GRP_STATE, state->active ? mask : 0, mask);
+    mask = VTSS_BIT(grp_id % 32);
+    value = (state->active ? mask : 0);
+#if (MERA_RTP_GRP_REG_CNT == 1)
+    REG_WRM(RTE_RTP_GRP_STATE, value, mask);
+#else
+    REG_WRM(RTE_RTP_GRP_STATE(grp_id / 32), value, mask);
+#endif
     return 0;
 }
 
@@ -1167,8 +1203,20 @@ int mera_ob_debug_print(struct mera_inst *inst,
     mera_debug_print_header(pr, "RTE Outbound Registers");
     mera_debug_print_reg_header(pr, "RTE Outbound");
     DBG_REG(REG_ADDR(RTE_OUTB_CFG), "OUTB_CFG");
-    DBG_REG(REG_ADDR(RTE_RTP_GRP_STATE), "RTP_GRP_STATE");
-    DBG_REG(REG_ADDR(RTE_OUTB_RTP_STATE), "OUTB_RTP_STATE");
+    for (i = 0; i < MERA_RTP_GRP_REG_CNT; i++) {
+#if (MERA_RTP_GRP_REG_CNT == 1)
+        DBG_REG(REG_ADDR(RTE_RTP_GRP_STATE), "RTP_GRP_STATE");
+#else
+        DBG_REG_I(REG_ADDR(RTE_RTP_GRP_STATE(i)), i, "RTP_GRP_STATE");
+#endif
+    }
+    for (i = 0; i < MERA_RTP_REG_CNT; i++) {
+#if (MERA_RTP_REG_CNT == 1)
+        DBG_REG(REG_ADDR(RTE_OUTB_RTP_STATE), "OUTB_RTP_STATE");
+#else
+        DBG_REG_I(REG_ADDR(RTE_OUTB_RTP_STATE(i)), i, "OUTB_RTP_STATE");
+#endif
+    }
     REG_RD(RTE_OUTB_PN_PDU_MISC, &value);
     DBG_PR_REG("PN_PDU_MISC", value);
     DBG_PR_REG_M("STATUS_MASK", RTE_OUTB_PN_PDU_MISC_PN_DATA_STATUS_MASK, value);

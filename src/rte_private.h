@@ -27,7 +27,7 @@
 #error "Environment not 32 or 64-bit."
 #endif
 
-#if 1
+#if defined(MERA_FPGA)
 #include "lan9662_regs_sr.h"
 #else
 #include "lan9662_regs.h"

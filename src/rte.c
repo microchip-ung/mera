@@ -93,6 +93,7 @@ int mera_wrm(struct mera_inst *inst, uint32_t addr, uint32_t value, uint32_t mas
 
 static int mera_gen_init(struct mera_inst *inst)
 {
+#if defined(LAN966X_BUILD_ID)
     uint32_t val, diff;
 
     T_I("enter");
@@ -107,6 +108,7 @@ static int mera_gen_init(struct mera_inst *inst)
         return -1;
     }
     T_I("build id: 0x%08x", val);
+#endif
     REG_WR(RTE_RTE_CFG, RTE_RTE_CFG_RTE_ENA(1) | RTE_RTE_CFG_RTE_BURSTMODE(2)); // Auto burst mode
     REG_WR(RTE_SC_LEN, RTE_SC_LEN_SC_LEN(20000000)); // 20.000.000 x 50 nsec = 1 sec
     REG_WR(RTE_SC_RESET, RTE_SC_RESET_SC_RESET_TIME_NS(1));
