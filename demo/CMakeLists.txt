@@ -24,7 +24,7 @@ add_custom_target(rpc_src DEPENDS
 include_directories(.)
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/rpc-ag)
 
-add_library(mera-demo-lib STATIC cli.c trace.c uio.c json_rpc.c ${CMAKE_CURRENT_BINARY_DIR}/rpc-ag/mera-rpc.c)
+add_library(mera-demo-lib STATIC cli.c trace.c uio.c spi.c json_rpc.c ${CMAKE_CURRENT_BINARY_DIR}/rpc-ag/mera-rpc.c)
 
 add_executable(mera-demo main.c)
 add_executable(mera-cmd cmd.c)

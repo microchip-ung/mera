@@ -42,7 +42,9 @@ void mscc_appl_trace_init(mscc_appl_init_t *init);
 void mscc_appl_cli_init(mscc_appl_init_t *init);
 void mscc_appl_json_rpc_init(mscc_appl_init_t *init);
 void mscc_appl_uio_init(mscc_appl_init_t *init);
+void mscc_appl_spi_init(mscc_appl_init_t *init);
 
+// UIO register access functions
 int uio_init(void);
 int uio_reg_read(struct mera_inst *inst,
                  const uintptr_t  addr,
@@ -51,6 +53,15 @@ int uio_reg_write(struct mera_inst *inst,
                   const uintptr_t  addr,
                   const uint32_t   data);
     
+// SPI register access functions
+int spi_reg_read(struct mera_inst *inst,
+                 const uint32_t   addr,
+                 uint32_t         *const value);
+int spi_reg_write(struct mera_inst *inst,
+                  const uint32_t   addr,
+                  const uint32_t   value);
+int spi_io_init(const char *device, int freq, int padding);
+
 // File descriptor read activity callback registration
 typedef void (*fd_read_callback_t)(int fd, void *ref);
 int fd_read_register(int fd, fd_read_callback_t callback, void *ref);

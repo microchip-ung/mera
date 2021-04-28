@@ -137,6 +137,46 @@ static mscc_appl_opt_t main_opt_foreground = {
     option_foreground
 };
 
+static int  SPI_REG_IO = 0;
+static char SPI_DEVICE[512];
+static int  SPI_PAD = 1;
+static int  SPI_FREQ = 5000000;
+static int spidev_opt(char *parm)
+{
+    char *s_pad, *s_freq;
+
+    s_pad = strchr(parm, '@');
+
+    if (s_pad) {
+        *s_pad = 0;
+        s_pad++;
+        SPI_PAD = atoi(s_pad);
+
+        s_freq = strchr(s_pad, '@');
+
+        if (s_freq) {
+            *s_freq = 0;
+            s_freq++;
+            SPI_FREQ = atoi(s_freq);
+        }
+    }
+
+    strncpy(SPI_DEVICE, parm, sizeof(SPI_DEVICE));
+    SPI_DEVICE[sizeof(SPI_DEVICE) - 1] = 0;
+    SPI_REG_IO = 1;
+
+    printf("Using SPI device: %s with %d padding byte%s at %d Hz\n",
+           SPI_DEVICE, SPI_PAD, (SPI_PAD == 1) ? "" : "s", SPI_FREQ);
+
+    return 0;
+}
+
+static mscc_appl_opt_t main_opt_spidev = {
+    "s:",
+    "<spidev[@pad[@freq]]>",
+    "SPI device, padding bytes and frequency to use (instead of UIO which is default)",
+    spidev_opt
+};
 
 static void main_init(mscc_appl_init_t *init)
 {
@@ -145,6 +185,7 @@ static void main_init(mscc_appl_init_t *init)
         mscc_appl_trace_register(&trace_module, trace_groups, TRACE_GROUP_CNT);
         mscc_appl_opt_reg(&main_opt);
         mscc_appl_opt_reg(&main_opt_foreground);
+        mscc_appl_opt_reg(&main_opt_spidev);
         break;
 
     case MSCC_INIT_CMD_INIT:
@@ -164,6 +205,7 @@ static void init_modules(mscc_appl_init_t *init)
     mscc_appl_trace_init(init);
     mscc_appl_json_rpc_init(init);
     mscc_appl_uio_init(init);
+    mscc_appl_spi_init(init);
 }
 
 typedef struct {
@@ -235,12 +277,23 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    if (uio_init() < 0) {
-        T_E("uio_init() failed");
-        return 1;
+    // Initialize IO layer
+    if (SPI_REG_IO) {
+        if (spi_io_init(SPI_DEVICE, SPI_FREQ, SPI_PAD) < 0) {
+            T_E("spi_io_init() failed");
+            return 1;
+        }
+        cb.reg_rd = spi_reg_read;
+        cb.reg_wr = spi_reg_write;
+    } else {
+        if (uio_init() < 0) {
+            T_E("uio_init() failed");
+            return 1;
+        }
+        cb.reg_rd = uio_reg_read;
+        cb.reg_wr = uio_reg_write;
     }
-    cb.reg_rd = uio_reg_read;
-    cb.reg_wr = uio_reg_write;
+
     cb.lock = mera_lock;
     cb.unlock = mera_unlock;
     cb.trace_printf = mera_callout_trace_printf;
