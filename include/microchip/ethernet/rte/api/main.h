@@ -108,7 +108,7 @@ void mera_destroy(struct mera_inst *inst);
 int mera_poll(struct mera_inst *inst);
 
 // Indicate FPGA implementation for now
-#define MERA_FPGA 1
+//#define MERA_FPGA 1
 
 // Number RTP IDs (1-based)
 #if defined(MERA_FPGA)
