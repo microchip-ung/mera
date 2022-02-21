@@ -107,7 +107,7 @@ void mera_destroy(struct mera_inst *inst);
 // Poll statistics, call approximately every second
 int mera_poll(struct mera_inst *inst);
 
-// Indicate FPGA implementation for now
+// For indicating FPGA implementation
 //#define MERA_FPGA 1
 
 // Number RTP IDs (1-based)
@@ -167,6 +167,21 @@ typedef struct {
 #define MERA_TIME_OFFSET_NONE 1000000000
 
 // RTE time
+// The Super Cycle of the RTE is set to 256 msec, supporting various intervals.
+// If the time base is 31.25 usec, the following intervals can be used:
+// 31.25 usec
+// 62.50 usec
+// 125 usec
+// 250 usec
+// 500 usec
+//   1 msec
+//   2 msec
+//   4 msec
+//   8 msec
+//  16 msec
+//  32 msec
+//  64 msec
+// 128 msec
 typedef struct {
     uint32_t offset;   // Offset from cycle start [nanoseconds]
     uint32_t interval; // Interval between timeouts [nanoseconds]
