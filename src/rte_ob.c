@@ -149,6 +149,7 @@ static int mera_ob_rtp_conf_set_private(struct mera_inst         *inst,
 {
     uint32_t        type = (conf->type == MERA_RTP_TYPE_OPC_UA ? 1 : 0);
     uint32_t        ena = (conf->type == MERA_RTP_TYPE_DISABLED ? 0 : 1);
+    uint32_t        value, sc_idx, sc_len;
     mera_rte_time_t time;
 
     MERA_RC(mera_rtp_check(inst, rtp_id));
@@ -162,11 +163,8 @@ static int mera_ob_rtp_conf_set_private(struct mera_inst         *inst,
            RTE_OUTB_RTP_MISC_DG_DATA_CP_ENA(1) |
            RTE_OUTB_RTP_MISC_WR_ACTION_ADDR(0));
 
-    // PDU length check
-    REG_WR(RTE_OUTB_RTP_PDU_CHKS(rtp_id),
-           RTE_OUTB_RTP_PDU_CHKS_PDU_LEN(conf->length) |
-           RTE_OUTB_RTP_PDU_CHKS_PN_CC_INIT(1) |
-           RTE_OUTB_RTP_PDU_CHKS_PN_CC_STORED(0));
+    // PDU length check discards all frames until timer is setup
+    REG_WR(RTE_OUTB_RTP_PDU_CHKS(rtp_id), RTE_OUTB_RTP_PDU_CHKS_PDU_LEN_M);
 
     REG_WR(RTE_OUTB_RTP_PN_MISC(rtp_id),
            RTE_OUTB_RTP_PN_MISC_PN_DATA_STATUS_VAL(conf->pn_ds) |
@@ -181,7 +179,26 @@ static int mera_ob_rtp_conf_set_private(struct mera_inst         *inst,
     REG_WR(RTE_OUTB_RTP_TIMER_CFG1(rtp_id), RTE_OUTB_RTP_TIMER_CFG1_FIRST_RUT_CNT(time.first));
     REG_WR(RTE_OUTB_RTP_TIMER_CFG2(rtp_id), RTE_OUTB_RTP_TIMER_CFG2_DELTA_RUT_CNT(time.delta));
     REG_WR(RTE_OUTB_RTP_TIMER_CFG3(rtp_id), RTE_OUTB_RTP_TIMER_CFG3_TIMEOUT_CNT_THRES(conf->time_cnt));
-    return mera_ob_timer_cmd(inst, time.cmd, RTE_TIMER_TYPE_RTP, rtp_id);
+
+    // Start timer and wait until next SC
+    REG_RD(RTE_SC_LEN, &value);
+    sc_len = RTE_SC_LEN_SC_LEN_X(value);
+    do {
+        REG_RD(RTE_SC_TIME, &value);
+        // Avoid starting timer if less than 1 msec to SC ends
+    } while ((RTE_SC_TIME_SC_RUT_CNT_X(value) + 20000) > sc_len);
+    sc_idx = RTE_SC_TIME_SC_IDX_X(value);
+    MERA_RC(mera_ob_timer_cmd(inst, time.cmd, RTE_TIMER_TYPE_RTP, rtp_id));
+    do {
+        REG_RD(RTE_SC_TIME, &value);
+    } while (RTE_SC_TIME_SC_IDX_X(value) == sc_idx);
+
+    // Setup PDU length check after timer has been activated
+    REG_WR(RTE_OUTB_RTP_PDU_CHKS(rtp_id),
+           RTE_OUTB_RTP_PDU_CHKS_PDU_LEN(conf->length) |
+           RTE_OUTB_RTP_PDU_CHKS_PN_CC_INIT(1) |
+           RTE_OUTB_RTP_PDU_CHKS_PN_CC_STORED(0));
+    return 0;
 }
 
 int mera_ob_rtp_conf_set(struct mera_inst         *inst,
