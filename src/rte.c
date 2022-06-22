@@ -189,6 +189,10 @@ char *mera_addr_txt(char *buf, mera_addr_t *addr)
 
 int mera_time_get(struct mera_inst *inst, const mera_time_t *time, mera_rte_time_t *rte)
 {
+    if (time->interval > MERA_TIME_MAX) {
+        T_E("illegal interval: %u nsec", time->interval);
+        return -1;
+    }
     if (time->offset >= MERA_TIME_OFFSET_NONE) {
         // Offset disabled using all-ones
         rte->first = 0xffffffff;
@@ -260,7 +264,8 @@ int mera_event_poll_private(struct mera_inst *inst,
     // Read and clear sticky bits
     REG_RD(RTE_OUTB_STICKY_BITS, &value);
     REG_WR(RTE_OUTB_STICKY_BITS, value);
-    if (RTE_OUTB_STICKY_BITS_RTP_STATE_STOPPED_STICKY_X(value)) {
+    if (RTE_OUTB_STICKY_BITS_RTP_STATE_STOPPED_STICKY_X(value) || inst->ob.stopped) {
+        inst->ob.stopped = 0;
         mask |= MERA_EVENT_RTP_STATE_STOPPED;
     }
     if (RTE_OUTB_STICKY_BITS_PN_DATA_STATUS_MISMATCH_STICKY_X(value)) {

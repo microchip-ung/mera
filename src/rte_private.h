@@ -127,6 +127,7 @@ typedef struct {
 typedef struct {
     mera_rtp_id_t       rtp_id;  // Counter polling
     uint16_t            dg_addr; // Next free DG address
+    mera_bool_t         stopped; // Stopped event
     mera_ob_rtp_entry_t rtp_tbl[RTE_OB_RTP_CNT];
     mera_ob_dg_entry_t  dg_tbl[RTE_OB_DG_CNT];
     mera_ob_wa_entry_t  wa_tbl[RTE_OB_WA_CNT];

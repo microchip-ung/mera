@@ -8,6 +8,10 @@
 #define RTE_OB_PN_DS_MASK 0xb7
 #define RTE_OB_PN_DS_VAL  0x35
 
+static int mera_ob_rtp_state_set_private(struct mera_inst          *inst,
+                                         const mera_rtp_id_t       rtp_id,
+                                         const mera_ob_rtp_state_t *const state);
+
 static void mera_ob_init_state(mera_ob_t *ob)
 {
     uint32_t i;
@@ -139,43 +143,26 @@ static int mera_ob_timer_cmd(struct mera_inst *inst,
                RTE_OUTB_TIMER_CMD_TIMER_RSLT(0) |
                RTE_OUTB_TIMER_CMD_TIMER_TYPE(type) |
                RTE_OUTB_TIMER_CMD_TIMER_IDX(idx));
+        if (cmd == RTE_TIMER_CMD_STOP) {
+            break;
+        }
     }
     return 0;
 }
 
-static int mera_ob_rtp_conf_set_private(struct mera_inst         *inst,
-                                        const mera_rtp_id_t      rtp_id,
-                                        const mera_ob_rtp_conf_t *const conf)
+static int mera_ob_rtp_timer_start(struct mera_inst         *inst,
+                                   const mera_rtp_id_t      rtp_id,
+                                   const mera_ob_rtp_conf_t *const conf)
 {
-    uint32_t        type = (conf->type == MERA_RTP_TYPE_OPC_UA ? 1 : 0);
-    uint32_t        ena = (conf->type == MERA_RTP_TYPE_DISABLED ? 0 : 1);
-    uint32_t        value, sc_idx, sc_len;
-    mera_rte_time_t time;
-
-    MERA_RC(mera_rtp_check(inst, rtp_id));
-    MERA_RC(mera_time_get(inst, &conf->time, &time));
-    inst->ob.rtp_tbl[rtp_id].conf = *conf;
-    REG_WR(RTE_OUTB_RTP_MISC(rtp_id),
-           RTE_OUTB_RTP_MISC_RTP_GRP_ID(conf->grp_id) |
-           RTE_OUTB_RTP_MISC_PDU_TYPE(type) |
-           RTE_OUTB_RTP_MISC_RTP_ENA(ena) |
-           RTE_OUTB_RTP_MISC_RTP_GRP_STATE_STOPPED_MODE(1) |
-           RTE_OUTB_RTP_MISC_DG_DATA_CP_ENA(1) |
-           RTE_OUTB_RTP_MISC_WR_ACTION_ADDR(0));
+    uint32_t            value, sc_idx, sc_len;
+    mera_rte_time_t     time;
+    mera_ob_rtp_state_t state;
 
     // PDU length check discards all frames until timer is setup
     REG_WR(RTE_OUTB_RTP_PDU_CHKS(rtp_id), RTE_OUTB_RTP_PDU_CHKS_PDU_LEN_M);
 
-    REG_WR(RTE_OUTB_RTP_PN_MISC(rtp_id),
-           RTE_OUTB_RTP_PN_MISC_PN_DATA_STATUS_VAL(conf->pn_ds) |
-           RTE_OUTB_RTP_PN_MISC_PN_DATA_STATUS_MISMATCH_VAL(0) |
-           RTE_OUTB_RTP_PN_MISC_PN_CC_CHK_ENA(1) |
-           RTE_OUTB_RTP_PN_MISC_PN_CC_MISMATCH_FRM_FWD_ENA(0) |
-           RTE_OUTB_RTP_PN_MISC_PN_DATA_STATUS_MISMATCH_DROP_ENA(conf->pn_discard));
-
-    REG_WR(RTE_OUTB_RTP_OPC_GRP_VER(rtp_id), conf->opc_grp_ver);
-
-    // Timer
+    // Setup timer
+    MERA_RC(mera_time_get(inst, &conf->time, &time));
     REG_WR(RTE_OUTB_RTP_TIMER_CFG1(rtp_id), RTE_OUTB_RTP_TIMER_CFG1_FIRST_RUT_CNT(time.first));
     REG_WR(RTE_OUTB_RTP_TIMER_CFG2(rtp_id), RTE_OUTB_RTP_TIMER_CFG2_DELTA_RUT_CNT(time.delta));
     REG_WR(RTE_OUTB_RTP_TIMER_CFG3(rtp_id), RTE_OUTB_RTP_TIMER_CFG3_TIMEOUT_CNT_THRES(conf->time_cnt));
@@ -187,17 +174,120 @@ static int mera_ob_rtp_conf_set_private(struct mera_inst         *inst,
         REG_RD(RTE_SC_TIME, &value);
         // Avoid starting timer if less than 1 msec to SC ends
     } while ((RTE_SC_TIME_SC_RUT_CNT_X(value) + 20000) > sc_len);
-    sc_idx = RTE_SC_TIME_SC_IDX_X(value);
     MERA_RC(mera_ob_timer_cmd(inst, time.cmd, RTE_TIMER_TYPE_RTP, rtp_id));
+    sc_idx = RTE_SC_TIME_SC_IDX_X(value);
     do {
         REG_RD(RTE_SC_TIME, &value);
     } while (RTE_SC_TIME_SC_IDX_X(value) == sc_idx);
 
-    // Setup PDU length check after timer has been activated
+    // Activate RTP
+    state.active = 1;
+    MERA_RC(mera_ob_rtp_state_set_private(inst, rtp_id, &state));
+
+    // Enable PDU checks
     REG_WR(RTE_OUTB_RTP_PDU_CHKS(rtp_id),
            RTE_OUTB_RTP_PDU_CHKS_PDU_LEN(conf->length) |
            RTE_OUTB_RTP_PDU_CHKS_PN_CC_INIT(1) |
            RTE_OUTB_RTP_PDU_CHKS_PN_CC_STORED(0));
+    return 0;
+}
+
+// Maximum threshold
+#define MERA_OB_TIME_CNT_MAX 100
+
+// RTP startup is done in steps as shown in the timeline below.
+//
+// T1: Entering mera_ob_rtp_conf_set() function.
+// T2: First timer is started, if timeout counter needs to be cleared.
+// T3: First timer is activated, PDU length check is enabled.
+// T4: Function detects timeout or counter cleared.
+// T5: Second timer is started based on configuration.
+// T6: Second timer is activated, PDU length check is enabled.
+//
+//     SC1       SC2       SC3       SC4
+// +---------+---------+---------+---------+---> Time
+//    T1  T2  T3 T4 T5  T6
+//
+static int mera_ob_rtp_conf_set_private(struct mera_inst         *inst,
+                                        const mera_rtp_id_t      rtp_id,
+                                        const mera_ob_rtp_conf_t *const conf)
+{
+    uint32_t            type = (conf->type == MERA_RTP_TYPE_OPC_UA ? 1 : 0);
+    uint32_t            ena = (conf->type == MERA_RTP_TYPE_DISABLED ? 0 : 1);
+    uint32_t            value, max, start = 1;
+    mera_rte_time_t     time;
+    mera_ob_rtp_conf_t  rtp_conf;
+    mera_ob_rtp_state_t state = {0};
+
+    T_D("enter, rtp_id: %u", rtp_id);
+    MERA_RC(mera_rtp_check(inst, rtp_id));
+    MERA_RC(mera_time_get(inst, &conf->time, &time));
+    if (conf->time_cnt > MERA_OB_TIME_CNT_MAX) {
+        T_E("illegal time_cnt: %u", conf->time_cnt);
+        return -1;
+    }
+    inst->ob.rtp_tbl[rtp_id].conf = *conf;
+    REG_WR(RTE_OUTB_RTP_MISC(rtp_id),
+           RTE_OUTB_RTP_MISC_RTP_GRP_ID(conf->grp_id) |
+           RTE_OUTB_RTP_MISC_PDU_TYPE(type) |
+           RTE_OUTB_RTP_MISC_RTP_ENA(ena) |
+           RTE_OUTB_RTP_MISC_RTP_GRP_STATE_STOPPED_MODE(1) |
+           RTE_OUTB_RTP_MISC_DG_DATA_CP_ENA(1) |
+           RTE_OUTB_RTP_MISC_WR_ACTION_ADDR(0));
+
+    REG_WR(RTE_OUTB_RTP_PN_MISC(rtp_id),
+           RTE_OUTB_RTP_PN_MISC_PN_DATA_STATUS_VAL(conf->pn_ds) |
+           RTE_OUTB_RTP_PN_MISC_PN_DATA_STATUS_MISMATCH_VAL(0) |
+           RTE_OUTB_RTP_PN_MISC_PN_CC_CHK_ENA(1) |
+           RTE_OUTB_RTP_PN_MISC_PN_CC_MISMATCH_FRM_FWD_ENA(0) |
+           RTE_OUTB_RTP_PN_MISC_PN_DATA_STATUS_MISMATCH_DROP_ENA(conf->pn_discard));
+
+    REG_WR(RTE_OUTB_RTP_OPC_GRP_VER(rtp_id), conf->opc_grp_ver);
+
+    // Stop timer and check timeout counter
+    MERA_RC(mera_ob_timer_cmd(inst, RTE_TIMER_CMD_STOP, RTE_TIMER_TYPE_RTP, rtp_id));
+    REG_WR(RTE_OUTB_RTP_TIMER_CFG3(rtp_id), RTE_OUTB_RTP_TIMER_CFG3_TIMEOUT_CNT_THRES(conf->time_cnt));
+    REG_RD(RTE_OUTB_RTP_TIMER_CFG3(rtp_id), &value);
+    value = RTE_OUTB_RTP_TIMER_CFG3_TIMEOUT_CNT_X(value);
+    if (conf->time.interval && conf->time_cnt && value >= conf->time_cnt) {
+        // Timeout count must be cleared
+        rtp_conf = *conf;
+        rtp_conf.time.interval = MERA_TIME_MAX;
+        rtp_conf.time.offset = MERA_TIME_MAX;
+        rtp_conf.time_cnt = (value + 1);
+        MERA_RC(mera_ob_rtp_timer_start(inst, rtp_id, &rtp_conf));
+        max = (conf->time.interval * conf->time_cnt);
+        if (max > MERA_TIME_MAX) {
+            max = MERA_TIME_MAX;
+        }
+        max = MERA_RUT_TIME(max);
+        while (1) {
+            REG_RD(RTE_OUTB_RTP_TIMER_CFG3(rtp_id), &value);
+            value = RTE_OUTB_RTP_TIMER_CFG3_TIMEOUT_CNT_X(value);
+            if (value == 0) {
+                T_D("timeout counter cleared");
+                break;
+            }
+            REG_RD(RTE_SC_TIME, &value);
+            value = RTE_SC_TIME_SC_RUT_CNT_X(value);
+            if (value > max) {
+                T_D("timeout: %u, max: %u (RUTs)", value, max);
+                start = 0;
+                break;
+            }
+        }
+        MERA_RC(mera_ob_timer_cmd(inst, RTE_TIMER_CMD_STOP, RTE_TIMER_TYPE_RTP, rtp_id));
+    }
+
+    if (start) {
+        // Start with real timer
+        MERA_RC(mera_ob_rtp_timer_start(inst, rtp_id, conf));
+    } else {
+        // Stop manually
+        inst->ob.stopped = 1;
+        MERA_RC(mera_ob_rtp_state_set_private(inst, rtp_id, &state));
+    }
+    T_D("exit");
     return 0;
 }
 

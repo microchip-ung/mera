@@ -182,6 +182,7 @@ typedef struct {
 //  32 msec
 //  64 msec
 // 128 msec
+#define MERA_TIME_MAX (128000000)
 typedef struct {
     uint32_t offset;   // Offset from cycle start [nanoseconds]
     uint32_t interval; // Interval between timeouts [nanoseconds]
@@ -225,7 +226,7 @@ int mera_ob_rtp_conf_get(struct mera_inst    *inst,
                          const mera_rtp_id_t rtp_id,
                          mera_ob_rtp_conf_t  *const conf);
 
-// Set RTP Outbound configuration
+// Set RTP Outbound configuration (may take up to 512 msec)
 int mera_ob_rtp_conf_set(struct mera_inst         *inst,
                          const mera_rtp_id_t      rtp_id,
                          const mera_ob_rtp_conf_t *const conf);
