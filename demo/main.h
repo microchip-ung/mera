@@ -55,10 +55,10 @@ int uio_reg_write(struct mera_inst *inst,
     
 // SPI register access functions
 int spi_reg_read(struct mera_inst *inst,
-                 const uint32_t   addr,
+                 const uintptr_t  addr,
                  uint32_t         *const value);
 int spi_reg_write(struct mera_inst *inst,
-                  const uint32_t   addr,
+                  const uintptr_t  addr,
                   const uint32_t   value);
 int spi_io_init(const char *device, int freq, int padding);
 

@@ -44,7 +44,7 @@ static mscc_appl_trace_group_t trace_groups[TRACE_GROUP_CNT] = {
 #define SPI_PADDING_MAX 15                 /* Maximum number of optional padding bytes */
 
 int spi_reg_read(struct mera_inst *inst,
-                 const uint32_t   addr,
+                 const uintptr_t  addr,
                  uint32_t         *const value)
 {
     uint8_t tx[SPI_NR_BYTES + SPI_PADDING_MAX] = { 0 };
@@ -93,7 +93,7 @@ int spi_reg_read(struct mera_inst *inst,
 }
 
 int spi_reg_write(struct mera_inst *inst,
-                  const uint32_t   addr,
+                  const uintptr_t  addr,
                   const uint32_t   value)
 {
     uint8_t tx[SPI_NR_BYTES] = { 0 };
