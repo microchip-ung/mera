@@ -8,7 +8,7 @@
 MERA (Microchip Ethernet RTE API), is a C library supporting the Real Time Engine
 of the LAN9662 switch.
 
-For an introduction to MERA, read the link:#docs/introduction[Introduction].
+For an introduction to MERA, read the link:#docs/intro[Introduction].
 
 === Audience
 

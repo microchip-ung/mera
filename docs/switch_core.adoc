@@ -25,5 +25,51 @@ Classification to an RTP ID requires the following:
 See the MESA documentation for more details on RCL classification.
 
 == SwitchDev
+If the Linux SwitchDev driver is used to control the Switch Core, the RTE port and
+Real Time Classification must be done as described in the following sections.
 
+=== RTE Port
+Forwarding to the RTE port must be enabled using a register write operation:
 
+[source,shell]
+----
+symreg qsys_sw_port_mode[4] 0x45000
+----
+
+=== Real Time Classification
+The (VID, PCP) values must be enabled for Real Time classification using register write operations.
+Up to 8 VLANs can be enabled. The example below enables untagged classification for all PCPs:
+
+[source,shell]
+----
+symreg ana_rt_vlan_pcp[0].pcp_mask 0xff
+symreg ana_rt_vlan_pcp[0].vlan_id 0
+symreg ana_rt_vlan_pcp[0].vlan_pcp_ena 1
+----
+
+Frames must then be classified to an RTP ID using a VCAP rule. The following example matches this:
+
+* VLAN index (rt_vlan_idx 0) setup above.
+* Profinet frames (rt_type 1)
+* FrameID (rt_frmid 0x8765)
+
+Matching frames are mapped to an RTP ID (rtp_id 3) and forwarded to port 4 (fwd_mask 0x10).
+
+[source,shell]
+----
+vcap add is1 1 1 s1_rt first 0 rt_vlan_idx 0 0x7 rt_type 1 0x3 rt_frmid 0x8765 0xffff s1_rt rtp_id 3 fwd_ena 1 fwd_mask 0x10
+----
+
+== Common
+
+=== QSPI
+
+If QSPI is used for data transfers, this must also be setup.
+The following commands are used to setup QSPI under Linux on the MCHP reference board.
+
+[source,shell]
+----
+mount -t configfs none /sys/kernel/config
+mkdir -p /sys/kernel/config/device-tree/overlays/tsys01
+cat /overlays/qspi_overlay.dtbo > /sys/kernel/config/device-tree/overlays/tsys01/dtbo
+----
