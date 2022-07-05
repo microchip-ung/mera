@@ -73,3 +73,15 @@ mount -t configfs none /sys/kernel/config
 mkdir -p /sys/kernel/config/device-tree/overlays/tsys01
 cat /overlays/qspi_overlay.dtbo > /sys/kernel/config/device-tree/overlays/tsys01/dtbo
 ----
+
+=== DT
+
+In order to be able to access the SRAM, it is required to expose the region as
+an UIO device. To do that it is required to add the following code in the DT.
+
+----
+lan966x_uio1: mscc_sram@100000 {
+        compatible = "microchip,uio_lan966x_irqmux";
+        reg = <0x00100000 0x20000>;
+};
+----
