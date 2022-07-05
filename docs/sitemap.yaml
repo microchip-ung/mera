@@ -8,8 +8,8 @@ pages:
 
     - name: "Release notes"
       pages:
-        - name: "MERA-2021.09"
-          src:  "docs/release-notes/mera-2021.09.adoc"
+        - name: "MERA-2022.06"
+          src:  "docs/release-notes/mera-2022.06.adoc"
 
     - name: "Introduction"
       src:  "docs/intro.adoc"

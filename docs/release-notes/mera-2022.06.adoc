@@ -1,0 +1,19 @@
+// Copyright (c) 2004-2022 Microchip Technology Inc. and its subsidiaries.
+// SPDX-License-Identifier: MIT
+
+= MERA-2022.06
+
+== MERA-2022.06
+
+|===
+|Version:          |MERA-2022.06
+|Previous Version: |N/A
+|Date:             |2022-07-05
+|Description:      |Roadmap release
+|===
+
+=== General
+This is the first release of the Microchip Ethernet RTE API (MERA).
+It is used for controlling the Real Time Engine (RTE) in LAN9662.
+
+
