@@ -57,7 +57,8 @@ Matching frames are mapped to an RTP ID (rtp_id 3) and forwarded to port 4 (fwd_
 
 [source,shell]
 ----
-vcap add is1 1 1 s1_rt first 0 rt_vlan_idx 0 0x7 rt_type 1 0x3 rt_frmid 0x8765 0xffff s1_rt rtp_id 3 fwd_ena 1 fwd_mask 0x10
+vcap add 10000 is1 1 0 VCAP_KFS_RT RT_VLAN_IDX 0 0x7 RT_TYPE 1 0x3 RT_FRMID 0x8765
+0xffff VCAP_AFS_S1_RT RTP_ID 3 FWD_ENA 1 FWD_MASK 0x10
 ----
 
 == Common
